@@ -1,0 +1,9 @@
+{
+  "installed": [
+    "data-science",
+    "llm-app",
+    "llm-extraction",
+    "security-hardening",
+    "visualization"
+  ]
+}

@@ -1,0 +1,3 @@
+{
+  "protected": ["main", "master", "develop", "release/*"]
+}

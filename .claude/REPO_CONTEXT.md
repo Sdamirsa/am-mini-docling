@@ -1,0 +1,98 @@
+# Docling — Condensed Repo Context
+
+> Python SDK + CLI that converts PDFs, Office, HTML, Markdown, audio, images, XML, LaTeX, etc. into a unified `DoclingDocument`. Powers the **Amir Engine** (see [AMIR_TODO.md](AMIR_TODO.md)).
+
+## High-level flow
+
+```
+input file/URL ─► Backend (parse) ─► Pipeline (orchestrate models)
+                                       │
+                                       ├─ Layout / Table / OCR / VLM / ASR models
+                                       │
+                                       └─► DoclingDocument ─► Exporters (md / html / json / DocTags / WebVTT)
+```
+
+Entry point for SDK use: [`docling/document_converter.py`](../docling/document_converter.py) → `DocumentConverter().convert(source)` returns a `ConversionResult` whose `.document` is a `DoclingDocument`.
+
+Structured extraction (beta): [`docling/document_extractor.py`](../docling/document_extractor.py).
+
+## Package map
+
+```
+docling/
+├── document_converter.py    # main entry: DocumentConverter
+├── document_extractor.py    # structured info extraction (beta)
+├── backend/                 # format parsers (one per input type)
+│   ├── pdf_backend.py, docling_parse_v4_backend.py, pypdfium2_backend.py
+│   ├── html_backend.py, md_backend.py, msword_backend.py, msexcel_backend.py
+│   ├── mspowerpoint_backend.py, webvtt_backend.py, latex_backend.py, ...
+├── pipeline/                # orchestrators that run models over backend output
+│   ├── standard_pdf_pipeline.py, threaded_standard_pdf_pipeline.py
+│   ├── vlm_pipeline.py, asr_pipeline.py, extraction_vlm_pipeline.py
+│   └── simple_pipeline.py
+├── models/                  # ML model wrappers (layout, tables, OCR, VLM, ASR, picture-desc)
+│   ├── base_*_model.py, factories/, inference_engines/, stages/, vlm_pipeline_models/
+├── datamodel/               # Pydantic schemas + options
+│   ├── document.py          # DoclingDocument-adjacent types
+│   ├── pipeline_options.py, pipeline_options_vlm_model.py
+│   ├── extraction_options.py, accelerator_options.py, settings.py
+├── chunking/                # chunkers for downstream RAG
+├── cli/                     # `docling` CLI
+├── service_client/          # KServe / remote inference clients
+├── utils/, exceptions.py, experimental/
+```
+
+## Where to plug Amir Engine in
+
+| Amir need | Docling primitive to use | File |
+|---|---|---|
+| PDF → structured doc | `DocumentConverter` | [`docling/document_converter.py`](../docling/document_converter.py) |
+| Pipeline customisation | Subclass `StandardPdfPipeline` or assemble own | [`docling/pipeline/standard_pdf_pipeline.py`](../docling/pipeline/standard_pdf_pipeline.py) |
+| Table extraction | `TableStructureModel` (in `models/`) via pipeline | [`docling/models/`](../docling/models/) |
+| Image / chart / picture description | `picture_description_base_model.py`, `vlm_pipeline_models/` | [`docling/models/`](../docling/models/) |
+| VLM (GraniteDocling) | `VlmPipeline` + VLM model specs | [`docling/pipeline/vlm_pipeline.py`](../docling/pipeline/vlm_pipeline.py), [`docling/datamodel/vlm_model_specs.py`](../docling/datamodel/vlm_model_specs.py) |
+| Bounding boxes / page layout | `DoclingDocument` items expose `prov` with bbox + page | [`docling/datamodel/document.py`](../docling/datamodel/document.py) |
+| Structured info extraction | `DocumentExtractor` (beta) | [`docling/document_extractor.py`](../docling/document_extractor.py) |
+| Pydantic-typed options | `pipeline_options.py`, `extraction_options.py` | [`docling/datamodel/`](../docling/datamodel/) |
+
+## Conventions to follow when extending
+
+- New input format → add a backend in `docling/backend/` inheriting from `abstract_backend.py`.
+- New model → inherit from `base_model.py` (or the specific `base_*_model.py`) and register via `models/factories/`.
+- New orchestration → add a pipeline in `docling/pipeline/` inheriting from `base_pipeline.py`.
+- New options → Pydantic v2 model in `docling/datamodel/`, not loose dicts.
+- Public APIs typed; Python 3.10+; `pathlib.Path` everywhere; no `hasattr` probing.
+
+## Key commands
+
+```bash
+make setup       # install dev env (⚠ broken on aarch64 — see below)
+make test        # pytest
+make check       # read-only checks
+make validate    # mutating hooks on current changeset (run before done)
+uv run pytest tests/test_<area>.py   # targeted tests
+DOCLING_GEN_TEST_DATA=1 uv run pytest  # regen golden data (only when intended)
+```
+
+### aarch64 / Jetson / Grace Hopper install
+
+`make setup` (`uv sync --frozen --all-extras`) fails on Linux aarch64 because
+`onnxruntime-gpu` only publishes x86_64 wheels on PyPI. Use the targeted set
+instead — same coverage minus the ONNX-GPU OCR variant:
+
+```bash
+uv sync --frozen --group dev --no-group docs --no-group examples --extra standard
+```
+
+The `standard` extra pulls `format-pdf`, `models-local` (torch), `feat-ocr-rapidocr`,
+office/web/latex backends, chunking, CLI and extract-core — enough for the full
+Amir Engine build through Phase 4. To restore ONNX-GPU on aarch64, install
+NVIDIA's Jetson `onnxruntime-gpu` wheel manually (Jetson Zoo) or patch
+`pyproject.toml` so `models-onnxruntime` falls back to CPU `onnxruntime` on
+aarch64.
+
+## External docs
+
+- Live docs: https://docling-project.github.io/docling/
+- DoclingDocument format & DocTags: see `docs/` and the arXiv references in [README.md](../README.md).
+- GraniteDocling VLM: https://huggingface.co/ibm-granite/granite-docling-258M

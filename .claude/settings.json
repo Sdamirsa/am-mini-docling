@@ -1,0 +1,129 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/.env*)",
+      "Read(**/credentials*)",
+      "Read(**/.git-credentials)",
+      "Read(**/id_rsa*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.kube/config)",
+      "Read(~/.docker/config.json)",
+      "Read(/proc/*/environ)",
+      "Edit(**/.env*)",
+      "Write(**/.env*)",
+      "Edit(**/.git/**)",
+      "Write(**/.git/**)",
+      "Edit(**/.claude/hooks/**)",
+      "Write(**/.claude/hooks/**)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -rf $HOME*)",
+      "Bash(sudo *)",
+      "Bash(curl *169.254.169.254*)",
+      "Bash(curl *metadata.google.internal*)",
+      "Bash(curl * | sh)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | sh)",
+      "Bash(wget * | bash)",
+      "Read(**/*.token)",
+      "Read(**/*.secret)",
+      "Read(**/*.password)",
+      "Read(**/.terraform/**)",
+      "Read(**/.terraformrc)",
+      "Read(**/.pgpass)",
+      "Read(**/google-credentials*.json)",
+      "Read(**/gcloud-credentials*.json)",
+      "Read(**/service-account*.json)",
+      "Bash(eval *)",
+      "Bash(exec *)",
+      "Bash(ssh -o StrictHostKeyChecking=no*)",
+      "Bash(scp *@*)",
+      "Bash(rsync *@*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset --hard*)",
+      "Bash(git rebase -i*)",
+      "WebFetch",
+      "Bash(pip install:*)",
+      "Bash(npm install:*)",
+      "Bash(uv add:*)"
+    ],
+    "defaultMode": "default"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/00-session-start.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/05-verify-hooks-lock.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/10-pre-deny-secrets.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/20-pre-deny-destructive.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/90-stop-log-invocation.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/15-warn-stale-model.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "includeCoAuthoredBy": false
+}
