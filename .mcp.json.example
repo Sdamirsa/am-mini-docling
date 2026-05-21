@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "//": "Copy this file to .mcp.json (which is gitignored) and edit per project.",
+    "//example-zotero": {
+      "command": "uvx",
+      "args": ["zotero-mcp-plus"],
+      "env": {
+        "ZOTERO_API_KEY": "your-api-key",
+        "ZOTERO_USER_ID": "your-user-id"
+      }
+    }
+  }
+}

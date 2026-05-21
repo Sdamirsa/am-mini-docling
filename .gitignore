@@ -437,3 +437,18 @@ pip-selfcheck.json
 
 # AI agents
 **/.bob/
+
+
+# managed:claude-folder-handler
+.claude/settings.local.json
+.claude/.cache/
+.claude/scheduled_tasks.lock
+CLAUDE.local.md
+.mcp.json
+# /managed:claude-folder-handler
+
+# claude-folder-handler scaffold backups
+.claude.bak.*/
+
+# Private handoff notes (machine-specific or sensitive context)
+.claude/private-hand-off/
