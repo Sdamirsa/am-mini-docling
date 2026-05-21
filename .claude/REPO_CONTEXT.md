@@ -119,7 +119,8 @@ out = PdfEngine(images_scale=1.5).convert(
 
 `PdfEngine` flags:
 - `save_artifacts=True` (default) — writes `document.json` + `nodes.jsonl` + figure/table crops + `run.json`. Auto-enables page + picture image generation.
-- `embed_images=True` — markdown is standalone (base64 data URIs).
+- `link_images=True` (default) — primary `<stem>.md` rewrites `<!-- image -->` placeholders to `![](images/picture_NNN.png)` so markdown viewers render figures.
+- `embed_images=True` (default) — additionally writes `<stem>.embedded.md` with base64 data URIs (standalone, ~10–15× larger than the primary).
 - `with_page_images=True` — explicit; redundant when `save_artifacts=True`.
 - `images_scale=1.5` — image render scale.
 

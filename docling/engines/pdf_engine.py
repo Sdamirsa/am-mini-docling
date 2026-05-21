@@ -28,6 +28,8 @@ from docling.exceptions import ConversionError
 
 _log = logging.getLogger(__name__)
 
+_PLACEHOLDER = "<!-- image -->"
+
 
 class PdfEngine:
     """Thin facade over :class:`DocumentConverter` for PDF inputs.
@@ -43,7 +45,8 @@ class PdfEngine:
         converter: Optional[DocumentConverter] = None,
         *,
         with_page_images: bool = False,
-        embed_images: bool = False,
+        embed_images: bool = True,
+        link_images: bool = True,
         images_scale: float = 1.5,
         save_artifacts: bool = True,
     ) -> None:
@@ -56,26 +59,34 @@ class PdfEngine:
             When provided, the other image flags are ignored.
         with_page_images
             When True, retain rendered page images so the HTML viewer
-            (``make_html_preview=True``) can be built later.
+            (``make_html_preview=True``) can be built later. Redundant when
+            ``save_artifacts=True`` (which forces this on internally).
         embed_images
-            When True, inline picture images as base64 data URIs in the
-            markdown export — producing a self-contained `.md` file with no
-            external image references.
+            When True (default), additionally writes a second
+            ``<stem>.embedded.md`` next to the primary markdown, with image
+            placeholders replaced by base64 data URIs — a standalone file you
+            can share without the surrounding ``images/`` folder.
+        link_images
+            When True (default), the primary ``<stem>.md`` swaps each image
+            placeholder for a relative ``![](images/picture_NNN.png)``
+            reference so markdown viewers render the figures inline.
+            Requires ``save_artifacts=True`` for the image files to exist.
         images_scale
             Scale factor applied when generating page or picture images.
         save_artifacts
             When True (default) and ``output_dir`` is given to :meth:`convert`,
-            also writes ``document.json``, ``nodes.jsonl``, and extracted
-            figure/table images under the per-PDF output folder. Implicitly
-            enables page + picture image generation in the pipeline so the
-            image crops are available.
+            writes ``document.json``, ``nodes.jsonl``, ``run.json`` and
+            extracted figure/table images under the per-PDF output folder.
+            Implicitly enables page + picture image generation.
         """
         self._image_scale = images_scale
         self._embed_images = embed_images
+        self._link_images = link_images
         self._save_artifacts = save_artifacts
         self._engine_config = {
             "with_page_images": with_page_images,
             "embed_images": embed_images,
+            "link_images": link_images,
             "images_scale": images_scale,
             "save_artifacts": save_artifacts,
             "converter_supplied": converter is not None,
@@ -120,7 +131,9 @@ class PdfEngine:
         source
             Path to a local ``.pdf`` file or an ``http(s)://`` URL.
         output_dir
-            If given, writes the markdown export to ``<output_dir>/<stem>.md``.
+            If given, writes the markdown export(s) to
+            ``<output_dir>/<stem>/<stem>.md`` (and ``<stem>.embedded.md`` when
+            ``embed_images=True``).
         max_num_pages
             Optional cap on the number of pages to convert.
         """
@@ -149,16 +162,12 @@ class PdfEngine:
             )
         finished_at = _dt.datetime.now(_dt.timezone.utc)
 
-        output = self._build_output(
-            result,
-            kind=kind,
-            normalised=normalised,
-            embed_images=self._embed_images,
-        )
+        output = self._build_output(result, kind=kind, normalised=normalised)
 
         if output.succeeded and output_dir is not None:
             pdf_dir = _resolve_pdf_dir(output_dir, normalised, result)
-            output.output_dir = self._write_markdown(output, pdf_dir)
+            pdf_dir.mkdir(parents=True, exist_ok=True)
+            output.output_dir = pdf_dir
 
             if self._save_artifacts:
                 try:
@@ -173,6 +182,20 @@ class PdfEngine:
                         PdfEngineError(component="artifacts", message=str(exc))
                     )
 
+            if self._link_images and output.markdown and output.picture_images:
+                rel_paths = [
+                    p.relative_to(pdf_dir).as_posix() for p in output.picture_images
+                ]
+                output.markdown = _link_picture_placeholders(output.markdown, rel_paths)
+
+            self._write_primary_markdown(output, pdf_dir)
+
+            if self._embed_images:
+                output.markdown_embedded_path = self._write_embedded_markdown(
+                    result, pdf_dir, output.errors
+                )
+
+            if self._save_artifacts:
                 output.run_json = write_run_snapshot(
                     pdf_dir,
                     source=normalised,
@@ -215,7 +238,6 @@ class PdfEngine:
         *,
         kind: SourceKind,
         normalised: str,
-        embed_images: bool = False,
     ) -> PdfConversionOutput:
         pages: list[PageSummary] = []
         for page in result.pages:
@@ -241,11 +263,10 @@ class PdfEngine:
             ConversionStatus.SUCCESS,
             ConversionStatus.PARTIAL_SUCCESS,
         }:
-            image_mode = (
-                ImageRefMode.EMBEDDED if embed_images else ImageRefMode.PLACEHOLDER
-            )
             try:
-                markdown = result.document.export_to_markdown(image_mode=image_mode)
+                markdown = result.document.export_to_markdown(
+                    image_mode=ImageRefMode.PLACEHOLDER
+                )
             except Exception as exc:  # pragma: no cover - defensive
                 _log.warning("PdfEngine: markdown export failed: %s", exc)
                 errors.append(
@@ -266,16 +287,51 @@ class PdfEngine:
         )
 
     @staticmethod
-    def _write_markdown(output: PdfConversionOutput, pdf_dir: Path) -> Path:
-        pdf_dir.mkdir(parents=True, exist_ok=True)
-        if output.markdown is not None:
-            target = pdf_dir / f"{pdf_dir.name}.md"
-            target.write_text(output.markdown, encoding="utf-8")
-            _log.info("PdfEngine: wrote markdown to %s", target)
-        return pdf_dir
+    def _write_primary_markdown(output: PdfConversionOutput, pdf_dir: Path) -> None:
+        if output.markdown is None:
+            return
+        target = pdf_dir / f"{pdf_dir.name}.md"
+        target.write_text(output.markdown, encoding="utf-8")
+        _log.info("PdfEngine: wrote markdown to %s", target)
+
+    @staticmethod
+    def _write_embedded_markdown(
+        result: ConversionResult,
+        pdf_dir: Path,
+        errors: list[PdfEngineError],
+    ) -> Path | None:
+        try:
+            embedded = result.document.export_to_markdown(
+                image_mode=ImageRefMode.EMBEDDED
+            )
+        except Exception as exc:
+            _log.warning("PdfEngine: embedded markdown export failed: %s", exc)
+            errors.append(
+                PdfEngineError(
+                    component="export_to_markdown_embedded", message=str(exc)
+                )
+            )
+            return None
+        target = pdf_dir / f"{pdf_dir.name}.embedded.md"
+        target.write_text(embedded, encoding="utf-8")
+        _log.info("PdfEngine: wrote embedded markdown to %s", target)
+        return target
 
 
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _link_picture_placeholders(markdown: str, picture_paths: list[str]) -> str:
+    """Replace ``<!-- image -->`` placeholders with ``![](path)`` refs in order."""
+    paths = iter(picture_paths)
+
+    def _swap(_match: re.Match[str]) -> str:
+        try:
+            return f"![]({next(paths)})"
+        except StopIteration:
+            return _PLACEHOLDER
+
+    return re.sub(re.escape(_PLACEHOLDER), _swap, markdown)
 
 
 def _resolve_pdf_dir(

@@ -54,7 +54,20 @@ class PdfConversionOutput(BaseModel):
     errors: list[PdfEngineError] = Field(default_factory=list)
     markdown: str | None = Field(
         None,
-        description="Markdown export of the document, when conversion succeeded.",
+        description=(
+            "Primary markdown export. When ``save_artifacts=True`` and "
+            "``link_images=True`` (defaults), image placeholders are replaced "
+            "with relative ``![](images/picture_NNN.png)`` references so the "
+            "file renders in any markdown viewer."
+        ),
+    )
+    markdown_embedded_path: Path | None = Field(
+        None,
+        description=(
+            "Path to ``<stem>.embedded.md`` — a second, standalone markdown "
+            "file with images inlined as base64 data URIs. Written when "
+            "``embed_images=True``."
+        ),
     )
     output_dir: Path | None = Field(
         None,

@@ -59,7 +59,7 @@ def test_pdf_engine_converts_local_fixture(tmp_path: Path) -> None:
     Verifies the wrapper's contract: status, source classification, page
     summaries, and markdown export are populated and internally consistent.
     """
-    engine = PdfEngine(save_artifacts=False)
+    engine = PdfEngine(save_artifacts=False, embed_images=False)
     output: PdfConversionOutput = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -123,19 +123,50 @@ def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
     not FIXTURE_PDF.exists(),
     reason=f"fixture {FIXTURE_PDF} not available",
 )
-def test_pdf_engine_embeds_images_in_markdown(tmp_path: Path) -> None:
-    """``embed_images=True`` produces a self-contained markdown file."""
-    engine = PdfEngine(embed_images=True, images_scale=1.0, save_artifacts=False)
+def test_pdf_engine_writes_embedded_markdown_companion(tmp_path: Path) -> None:
+    """``embed_images=True`` writes a second ``<stem>.embedded.md`` companion."""
+    engine = PdfEngine(embed_images=True, images_scale=1.0, save_artifacts=True)
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
+    pdf_dir = tmp_path / FIXTURE_PDF.stem
+
+    # Primary stays small (linked refs); the embedded companion holds base64.
+    assert output.markdown_embedded_path == pdf_dir / f"{FIXTURE_PDF.stem}.embedded.md"
+    assert output.markdown_embedded_path.exists()
+    embedded = output.markdown_embedded_path.read_text(encoding="utf-8")
+    assert "<!-- image -->" not in embedded
+    if "![" in embedded:
+        assert "data:image" in embedded
+
+    # Primary `.md` exists and has no base64 blobs.
+    primary = pdf_dir / f"{FIXTURE_PDF.stem}.md"
+    assert primary.exists()
+    assert "data:image" not in primary.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(
+    not FIXTURE_PDF.exists(),
+    reason=f"fixture {FIXTURE_PDF} not available",
+)
+def test_pdf_engine_links_images_in_primary_markdown(tmp_path: Path) -> None:
+    """``link_images=True`` (default) rewrites placeholders to ``![](images/..)``."""
+    engine = PdfEngine(
+        embed_images=False, link_images=True, images_scale=1.0, save_artifacts=True
+    )
+    output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
+
+    assert output.succeeded, f"conversion failed: {output.errors}"
+    if not output.picture_images:
+        pytest.skip("fixture has no extracted pictures to link")
+
     assert output.markdown is not None
-    # No bare placeholders should remain when images are embedded.
-    assert "<!-- image -->" not in output.markdown
-    # If the document contains any pictures, they appear as base64 data URIs.
-    # (Some fixtures may have no pictures at all — accept that case too.)
-    if "![" in output.markdown:
-        assert "data:image" in output.markdown
+    # Every saved picture should be referenced; no leftover placeholders for them.
+    placeholders = output.markdown.count("<!-- image -->")
+    assert placeholders == 0
+    for picture in output.picture_images:
+        rel = picture.relative_to(output.output_dir).as_posix()
+        assert f"![]({rel})" in output.markdown
 
 
 @pytest.mark.skipif(

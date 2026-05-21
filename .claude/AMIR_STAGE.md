@@ -17,7 +17,7 @@ Live tracker for the build defined in [AMIR_TODO.md](AMIR_TODO.md). Keep entries
 | Local paths + URLs | ✅ done | `classify_source()` + `validate_pdf_source()`. |
 | Error handling + logging | ✅ done | Catches `ConversionError`; `_log = logging.getLogger(__name__)`. |
 | HTML bbox visualiser (clickable) | ✅ done | `docling/engines/visualizer.py` — overlays are one-per-`DocItem` from `iterate_items()`, **click any bbox** to open a side panel with the node's full metadata; Esc to clear. |
-| Standalone markdown | ✅ done | `PdfEngine(embed_images=True)` → base64 data URIs, no external image refs. |
+| Linked + standalone markdown | ✅ done | `link_images=True` (default): primary `<stem>.md` rewrites placeholders to `![](images/picture_NNN.png)` so markdown viewers render figures. `embed_images=True` (default): additionally writes `<stem>.embedded.md` with base64 data URIs for single-file sharing. |
 | Per-PDF output folder | ✅ done | All artifacts land under `<output_dir>/<pdf-stem>/` (sanitised). |
 | Persistent data nodes | ✅ done | `docling/engines/artifacts.py` — writes `document.json` (full `DoclingDocument`), `nodes.jsonl` (one line per node with bbox/text/captions/table data + `image_path` for pictures/tables), and `images/picture_NNN.png` / `table_NNN.png` via `PictureItem.get_image()` / `TableItem.get_image()`. |
 | Run snapshot | ✅ done | `docling/engines/run_snapshot.py` — `<pdf-dir>/run.json` with schema_version, source, status, timing (started_at / finished_at / duration_seconds), engine_config, full pipeline_options (`serialize_as_any=True` so subclass fields like `layout_options.model_spec` survive), per-stage models summary, environment (python, platform, machine, system, tracked package versions), output_summary, errors. Hostname intentionally **not** captured. |
@@ -35,7 +35,8 @@ Reason: `docling/models/` holds upstream's ML-model wrappers (layout, OCR, VLM);
 
 ```
 out/<pdf-stem>/
-├── <pdf-stem>.md            # markdown (standalone if PdfEngine(embed_images=True))
+├── <pdf-stem>.md            # primary markdown (image placeholders → ![](images/picture_NNN.png))
+├── <pdf-stem>.embedded.md   # standalone companion with base64-inlined images (when embed_images=True)
 ├── document.json            # full DoclingDocument (round-trippable)
 ├── nodes.jsonl              # one JSON object per node: label, prov/bbox, text,
 │                            # captions, table data, _kind, _level, image_path
@@ -69,6 +70,7 @@ Move to **PHASE 2 — Content Extraction (Text / Image / Table)** per [AMIR_TODO
 | 2026-05-21 | 1 | **Persistent data nodes** landed: `docling/engines/artifacts.py` (`document.json` + `nodes.jsonl` + figure/table crops). `PdfEngine(save_artifacts=True)` is the default. |
 | 2026-05-21 | 1 | **Clickable preview** landed: viewer now draws one bbox per `DocItem`, click opens side panel with full node JSON. Esc clears selection. |
 | 2026-05-21 | 1 | **Run snapshot** landed: `docling/engines/run_snapshot.py` writes `run.json` per PDF (env, timing, models, full pipeline_options). `tach.toml` gained a `docling.engines` module entry. 9/9 tests green; `make validate` clean. |
+| 2026-05-21 | 1 | **Linked + standalone markdown** landed: primary `.md` rewrites `<!-- image -->` placeholders to `![](images/picture_NNN.png)` refs (matches `nodes.jsonl.image_path`); `embed_images=True` (now default) additionally writes `<stem>.embedded.md` with base64 images. Manuscript smoke: primary 55 KB / 0 placeholders, embedded 697 KB / 7 base64 figures. |
 
 ## Blockers
 

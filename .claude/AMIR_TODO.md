@@ -12,7 +12,8 @@ Landed paths differ from the original plan; see [AMIR_STAGE.md](AMIR_STAGE.md) f
 - [X] Error handling + structured logging (`PdfEngineError`, `_log`)
 - [X] HTML bbox preview (`docling/engines/visualizer.py`) — **clickable**: one bbox per `DocItem`, click opens side panel with full node metadata (matches `nodes.jsonl`)
 - [X] Per-PDF output subfolder (`<output_dir>/<pdf-stem>/`)
-- [X] Standalone markdown via `PdfEngine(embed_images=True)` (base64 data URIs)
+- [X] Linked primary markdown (`link_images=True`, default) — placeholders rewritten to `![](images/picture_NNN.png)` so viewers render figures
+- [X] Standalone embedded companion (`embed_images=True`, default) — second `<stem>.embedded.md` with base64 images for single-file sharing
 - [X] Persistent data nodes (`docling/engines/artifacts.py`) — writes `document.json` + `nodes.jsonl` + `images/picture_NNN.png` / `table_NNN.png` via `PictureItem.get_image()` / `TableItem.get_image()`
 - [X] Per-PDF `run.json` (`docling/engines/run_snapshot.py`) — env, timing, engine_config, full `pipeline_options` (with model_spec), per-stage models summary, package versions
 

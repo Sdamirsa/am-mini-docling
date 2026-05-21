@@ -29,7 +29,8 @@ open samples/out/my-paper/preview.html       # macOS
 
 | File | Content |
 |---|---|
-| `<pdf-stem>.md` | Markdown export. With `PdfEngine(embed_images=True)` images are inlined as base64 data URIs, producing a standalone `.md`. |
+| `<pdf-stem>.md` | Primary markdown. Image placeholders are rewritten to `![](images/picture_NNN.png)` relative refs so the file renders in any markdown viewer (controlled by `link_images=True`, default). |
+| `<pdf-stem>.embedded.md` | Standalone companion with images inlined as base64 data URIs — written when `embed_images=True` (default). Larger; share when you can't ship the `images/` folder. |
 | `document.json` | Full `DoclingDocument` serialisation (canonical, round-trippable). |
 | `nodes.jsonl` | One JSON object per node from `iterate_items()` — label, bbox/page (`prov`), text, captions, table cells, plus `_kind`, `_level`, and `image_path` for pictures/tables. |
 | `run.json` | Reproducibility snapshot: schema version, source, status, timing, engine config, full `pipeline_options` (incl. model spec), per-stage models summary, environment (python, platform, machine, package versions), output summary, errors. |
@@ -43,7 +44,8 @@ open samples/out/my-paper/preview.html       # macOS
 ```python
 PdfEngine(
     save_artifacts=True,   # default — writes document.json + nodes.jsonl + image crops + run.json
-    embed_images=True,     # markdown becomes standalone (base64 data URIs)
+    link_images=True,      # default — primary .md uses relative image refs (renders in viewers)
+    embed_images=True,     # default — also writes <stem>.embedded.md with base64 images
     with_page_images=True, # explicit; redundant when save_artifacts=True
     images_scale=1.5,      # render scale for page / picture / table crops
 )
