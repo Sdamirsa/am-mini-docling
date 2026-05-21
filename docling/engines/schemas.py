@@ -60,6 +60,26 @@ class PdfConversionOutput(BaseModel):
         None,
         description="Directory where artifacts (markdown, json) were saved, if any.",
     )
+    document_json: Path | None = Field(
+        None,
+        description="Path to the saved DoclingDocument JSON, when artifacts were written.",
+    )
+    nodes_jsonl: Path | None = Field(
+        None,
+        description="Path to the per-node JSONL, when artifacts were written.",
+    )
+    run_json: Path | None = Field(
+        None,
+        description="Path to the run snapshot (env, timing, config, models).",
+    )
+    picture_images: list[Path] = Field(
+        default_factory=list,
+        description="Paths to extracted figure images.",
+    )
+    table_images: list[Path] = Field(
+        default_factory=list,
+        description="Paths to extracted table images.",
+    )
     preview_html: Path | None = Field(
         None,
         description="Path to the HTML bounding-box viewer, when rendered.",

@@ -1,14 +1,11 @@
 """HTML bounding-box viewer for :class:`PdfEngine` results.
 
-Produces a single ``preview.html`` (plus one PNG per page) showing the
-rendered page image with absolutely-positioned overlays for each layout
-cluster. Hover surfaces the cluster metadata (label, confidence, cell
-count, text preview) so a non-technical reviewer can see what the pipeline
-captured at a glance.
-
-The viewer reads from the live :class:`docling.datamodel.document.ConversionResult`
-referenced by :attr:`PdfConversionOutput.raw` because page images and cluster
-geometry are not part of the serialisable schema.
+Produces a single ``preview.html`` (plus one PNG per page) showing each page
+image with absolutely-positioned overlays — one per :class:`DocItem` from
+:meth:`DoclingDocument.iterate_items`. Hover surfaces a short label tag;
+clicking a box opens a side panel with the node's full metadata
+(self_ref, label, level, prov/bbox, text, captions, table data, …) — the
+same data that's persisted to ``nodes.jsonl``.
 """
 
 from __future__ import annotations
@@ -16,10 +13,9 @@ from __future__ import annotations
 import html
 import json
 import logging
-from collections.abc import Iterable
 from pathlib import Path
 
-from docling.datamodel.base_models import Cluster, ConversionStatus, Page
+from docling.datamodel.base_models import ConversionStatus, Page
 from docling.datamodel.document import ConversionResult
 
 _log = logging.getLogger(__name__)
@@ -56,17 +52,7 @@ def render_html_preview(
     image_scale: float = 1.5,
     page_image_subdir: str = "images",
 ) -> Path:
-    """Render an HTML viewer for *result* into *target_dir*.
-
-    Writes ``preview.html`` and one PNG per page under
-    ``target_dir/<page_image_subdir>/``. Returns the path to ``preview.html``.
-
-    Raises
-    ------
-    PreviewError
-        If the conversion has no pages or images were not generated (the
-        engine must have been built with ``with_page_images=True``).
-    """
+    """Render an HTML viewer for *result* into *target_dir*."""
     if result.status not in {
         ConversionStatus.SUCCESS,
         ConversionStatus.PARTIAL_SUCCESS,
@@ -76,14 +62,23 @@ def render_html_preview(
         )
     if not result.pages:
         raise PreviewError("Cannot render preview: result has no pages.")
+    if result.document is None:
+        raise PreviewError("Cannot render preview: result has no document.")
 
     target_dir.mkdir(parents=True, exist_ok=True)
     images_dir = target_dir / page_image_subdir
     images_dir.mkdir(exist_ok=True)
 
+    items_by_page = _index_items_by_page(result)
+
     page_blocks: list[str] = []
     for page in result.pages:
-        page_block = _render_page_block(page, images_dir, image_scale=image_scale)
+        page_block = _render_page_block(
+            page,
+            items_by_page.get(page.page_no, []),
+            images_dir,
+            image_scale=image_scale,
+        )
         if page_block is not None:
             page_blocks.append(page_block)
 
@@ -104,8 +99,22 @@ def render_html_preview(
     return target
 
 
+def _index_items_by_page(result: ConversionResult) -> dict[int, list[tuple]]:
+    """Group ``iterate_items()`` output by page (one entry per prov)."""
+    by_page: dict[int, list[tuple]] = {}
+    for item, level in result.document.iterate_items():
+        prov_list = getattr(item, "prov", None) or []
+        for prov_idx, prov in enumerate(prov_list):
+            by_page.setdefault(prov.page_no, []).append((item, level, prov_idx, prov))
+    return by_page
+
+
 def _render_page_block(
-    page: Page, images_dir: Path, *, image_scale: float
+    page: Page,
+    page_items: list[tuple],
+    images_dir: Path,
+    *,
+    image_scale: float,
 ) -> str | None:
     image = page.get_image(scale=image_scale)
     if image is None or page.size is None:
@@ -118,12 +127,16 @@ def _render_page_block(
     image_path = images_dir / f"page_{page.page_no:04d}.png"
     image.save(image_path, format="PNG")
 
-    layout = page.predictions.layout if page.predictions else None
-    clusters: list[Cluster] = list(layout.clusters) if layout is not None else []
-
     overlays = "\n".join(
-        _render_overlay(c, page_height=page.size.height, image_scale=image_scale)
-        for c in _flatten(clusters)
+        _render_overlay(
+            item,
+            level,
+            prov_idx,
+            prov,
+            page_height=page.size.height,
+            image_scale=image_scale,
+        )
+        for (item, level, prov_idx, prov) in page_items
     )
 
     rel_image = image_path.relative_to(images_dir.parent).as_posix()
@@ -132,7 +145,7 @@ def _render_page_block(
 
     return _PAGE_TEMPLATE.format(
         page_no=page.page_no,
-        cluster_count=sum(1 for _ in _flatten(clusters)),
+        item_count=len(page_items),
         image_src=html.escape(rel_image),
         img_w=img_w,
         img_h=img_h,
@@ -140,48 +153,49 @@ def _render_page_block(
     )
 
 
-def _flatten(clusters: Iterable[Cluster]) -> Iterable[Cluster]:
-    for c in clusters:
-        yield c
-        yield from _flatten(c.children)
-
-
-def _render_overlay(cluster: Cluster, *, page_height: float, image_scale: float) -> str:
-    tl = cluster.bbox.to_top_left_origin(page_height=page_height)
+def _render_overlay(
+    item,
+    level: int,
+    prov_idx: int,
+    prov,
+    *,
+    page_height: float,
+    image_scale: float,
+) -> str:
+    tl = prov.bbox.to_top_left_origin(page_height=page_height)
     left = tl.l * image_scale
     top = tl.t * image_scale
     width = (tl.r - tl.l) * image_scale
     height = (tl.b - tl.t) * image_scale
 
-    label_value = (
-        cluster.label.value if hasattr(cluster.label, "value") else str(cluster.label)
-    )
+    label_value = item.label.value if hasattr(item.label, "value") else str(item.label)
     colour = LABEL_COLOURS.get(label_value, LABEL_DEFAULT)
-    text_preview = " ".join(
-        c.text for c in cluster.cells[:6] if getattr(c, "text", None)
-    ).strip()
-    if len(text_preview) > 240:
-        text_preview = text_preview[:240] + "…"
 
-    metadata = {
-        "id": cluster.id,
-        "label": label_value,
-        "confidence": round(cluster.confidence, 3),
-        "cells": len(cluster.cells),
-        "bbox_pdf": [round(v, 1) for v in cluster.bbox.as_tuple()],
-        "text": text_preview,
-    }
-    tooltip = html.escape(json.dumps(metadata, ensure_ascii=False, indent=2))
+    node = _node_to_dict(item, level)
+    node["_prov_index"] = prov_idx
+    node_json = html.escape(json.dumps(node, ensure_ascii=False, indent=2))
+
+    self_ref = getattr(item, "self_ref", "") or ""
+    tag_label = label_value
 
     return (
         f'<div class="bbox" data-label="{html.escape(label_value)}" '
+        f'data-self-ref="{html.escape(self_ref)}" '
+        f'data-meta="{node_json}" '
         f'style="left:{left:.1f}px; top:{top:.1f}px; '
         f"width:{width:.1f}px; height:{height:.1f}px; "
-        f'border-color:{colour}; background-color:{colour}22;" '
-        f'title="{tooltip}">'
-        f'<span class="bbox-tag" style="background:{colour};">{html.escape(label_value)}</span>'
+        f'border-color:{colour}; background-color:{colour}22;">'
+        f'<span class="bbox-tag" style="background:{colour};">{html.escape(tag_label)}</span>'
         f"</div>"
     )
+
+
+def _node_to_dict(item, level: int) -> dict:
+    """Serialise a document item to a JSON-friendly dict (matches artifacts.py)."""
+    dumped = item.model_dump(mode="json", exclude={"image"})
+    dumped["_kind"] = type(item).__name__
+    dumped["_level"] = level
+    return dumped
 
 
 def _render_legend() -> str:
@@ -195,7 +209,7 @@ def _render_legend() -> str:
 
 _PAGE_TEMPLATE = """
 <section class="page" id="page-{page_no}">
-  <h2>Page {page_no} <small>({cluster_count} clusters)</small></h2>
+  <h2>Page {page_no} <small>({item_count} nodes)</small></h2>
   <div class="page-canvas" style="width:{img_w}px; height:{img_h}px;">
     <img src="{image_src}" width="{img_w}" height="{img_h}" alt="page {page_no}"/>
     {overlays}
@@ -219,12 +233,13 @@ _HTML_TEMPLATE = """<!doctype html>
     padding: 12px 20px; z-index: 10;
   }}
   header h1 {{ margin: 0; font-size: 16px; font-weight: 600; }}
+  header .hint {{ color: #777; font-size: 12px; margin-top: 4px; }}
   .legend {{ margin-top: 8px; font-size: 12px; display: flex; flex-wrap: wrap; gap: 12px; }}
   .legend-item {{ display: inline-flex; align-items: center; gap: 4px; }}
   .legend-swatch {{
     display: inline-block; width: 12px; height: 12px; border-radius: 2px;
   }}
-  main {{ padding: 20px; }}
+  main {{ padding: 20px; padding-right: 440px; }}
   section.page {{
     background: #fff; margin: 0 auto 32px; padding: 16px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-radius: 4px; width: max-content;
@@ -237,24 +252,111 @@ _HTML_TEMPLATE = """<!doctype html>
   .page-canvas img {{ display: block; user-select: none; }}
   .bbox {{
     position: absolute; border: 2px solid; box-sizing: border-box;
-    pointer-events: auto; cursor: help; transition: background-color 0.1s;
+    pointer-events: auto; cursor: pointer; transition: background-color 0.1s;
   }}
   .bbox:hover {{ background-color: rgba(255, 230, 0, 0.35) !important; z-index: 5; }}
+  .bbox.selected {{
+    background-color: rgba(255, 200, 0, 0.55) !important;
+    z-index: 6; outline: 2px solid #000;
+  }}
   .bbox-tag {{
     position: absolute; top: -16px; left: -2px; padding: 1px 4px;
     color: #fff; font-size: 9px; font-weight: 600;
     border-radius: 2px 2px 0 0; white-space: nowrap; opacity: 0.85;
+    pointer-events: none;
   }}
+  #panel {{
+    position: fixed; top: 0; right: 0; width: 420px; height: 100vh;
+    background: #fff; border-left: 1px solid #ddd; box-shadow: -2px 0 6px rgba(0,0,0,0.05);
+    display: flex; flex-direction: column; z-index: 20;
+  }}
+  #panel header {{
+    position: static; padding: 12px 16px; background: #fafafa;
+    border-bottom: 1px solid #eee; flex-shrink: 0;
+  }}
+  #panel header h2 {{ margin: 0; font-size: 14px; font-weight: 600; color: #333; }}
+  #panel header .self-ref {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: #666; margin-top: 2px;
+  }}
+  #panel-body {{
+    flex: 1; overflow: auto; padding: 12px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  }}
+  #panel-empty {{ color: #888; font-style: italic; }}
+  #panel-close {{
+    float: right; border: 0; background: transparent; cursor: pointer;
+    color: #888; font-size: 16px; padding: 0; margin-left: 8px;
+  }}
+  #panel-close:hover {{ color: #222; }}
 </style>
 </head>
 <body>
 <header>
   <h1>Docling preview — {title}</h1>
+  <div class="hint">Click any bounding box to inspect the full node metadata.</div>
   {legend}
 </header>
 <main>
 {pages}
 </main>
+<aside id="panel">
+  <header>
+    <button id="panel-close" title="Clear selection">&times;</button>
+    <h2 id="panel-title">Node inspector</h2>
+    <div class="self-ref" id="panel-self-ref"></div>
+  </header>
+  <div id="panel-body">
+    <span id="panel-empty">Click a bounding box to see its full metadata here.</span>
+  </div>
+</aside>
+<script>
+(function() {{
+  const panelTitle = document.getElementById('panel-title');
+  const panelSelfRef = document.getElementById('panel-self-ref');
+  const panelBody = document.getElementById('panel-body');
+  const panelClose = document.getElementById('panel-close');
+  let selected = null;
+
+  function clearSelection() {{
+    if (selected) selected.classList.remove('selected');
+    selected = null;
+    panelTitle.textContent = 'Node inspector';
+    panelSelfRef.textContent = '';
+    panelBody.innerHTML = '<span id="panel-empty">Click a bounding box to see its full metadata here.</span>';
+  }}
+
+  function showNode(box) {{
+    if (selected) selected.classList.remove('selected');
+    box.classList.add('selected');
+    selected = box;
+    const label = box.dataset.label || '(unlabelled)';
+    const selfRef = box.dataset.selfRef || '';
+    const meta = box.dataset.meta || '{{}}';
+    panelTitle.textContent = label;
+    panelSelfRef.textContent = selfRef;
+    try {{
+      const obj = JSON.parse(meta);
+      panelBody.textContent = JSON.stringify(obj, null, 2);
+    }} catch (e) {{
+      panelBody.textContent = meta;
+    }}
+  }}
+
+  document.querySelectorAll('.bbox').forEach(function(box) {{
+    box.addEventListener('click', function(e) {{
+      e.stopPropagation();
+      showNode(box);
+    }});
+  }});
+
+  panelClose.addEventListener('click', clearSelection);
+  document.addEventListener('keydown', function(e) {{
+    if (e.key === 'Escape') clearSelection();
+  }});
+}})();
+</script>
 </body>
 </html>
 """

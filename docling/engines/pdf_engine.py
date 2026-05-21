@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import re
 from pathlib import Path
@@ -13,6 +14,8 @@ from docling.datamodel.base_models import ConversionStatus, InputFormat
 from docling.datamodel.document import ConversionResult
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.engines.artifacts import ArtifactsError, write_artifacts
+from docling.engines.run_snapshot import write_run_snapshot
 from docling.engines.schemas import (
     PageSummary,
     PdfConversionOutput,
@@ -42,6 +45,7 @@ class PdfEngine:
         with_page_images: bool = False,
         embed_images: bool = False,
         images_scale: float = 1.5,
+        save_artifacts: bool = True,
     ) -> None:
         """Initialise the engine.
 
@@ -51,37 +55,54 @@ class PdfEngine:
             Optional pre-built :class:`DocumentConverter` (advanced use).
             When provided, the other image flags are ignored.
         with_page_images
-            When True, configures the PDF pipeline to retain rendered page
-            images so the HTML viewer (``make_html_preview=True``) can be
-            built later.
+            When True, retain rendered page images so the HTML viewer
+            (``make_html_preview=True``) can be built later.
         embed_images
-            When True, extracts picture images from the PDF and inlines them
-            as base64 data URIs in the markdown export — producing a
-            self-contained `.md` file with no external image references.
-            Adds modest time + memory cost.
+            When True, inline picture images as base64 data URIs in the
+            markdown export — producing a self-contained `.md` file with no
+            external image references.
         images_scale
             Scale factor applied when generating page or picture images.
-            Higher values give crisper images at the cost of memory and size.
+        save_artifacts
+            When True (default) and ``output_dir`` is given to :meth:`convert`,
+            also writes ``document.json``, ``nodes.jsonl``, and extracted
+            figure/table images under the per-PDF output folder. Implicitly
+            enables page + picture image generation in the pipeline so the
+            image crops are available.
         """
         self._image_scale = images_scale
         self._embed_images = embed_images
+        self._save_artifacts = save_artifacts
+        self._engine_config = {
+            "with_page_images": with_page_images,
+            "embed_images": embed_images,
+            "images_scale": images_scale,
+            "save_artifacts": save_artifacts,
+            "converter_supplied": converter is not None,
+        }
         if converter is not None:
             self._converter = converter
+            self._pipeline_options: PdfPipelineOptions | None = None
             return
 
-        if with_page_images or embed_images:
-            pipeline_options = PdfPipelineOptions(
-                generate_page_images=with_page_images,
-                generate_picture_images=embed_images,
+        need_page_images = with_page_images or save_artifacts
+        need_picture_images = embed_images or save_artifacts
+        if need_page_images or need_picture_images:
+            self._pipeline_options = PdfPipelineOptions(
+                generate_page_images=need_page_images,
+                generate_picture_images=need_picture_images,
                 images_scale=images_scale,
             )
             self._converter = DocumentConverter(
                 allowed_formats=[InputFormat.PDF],
                 format_options={
-                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=self._pipeline_options
+                    )
                 },
             )
         else:
+            self._pipeline_options = PdfPipelineOptions()
             self._converter = DocumentConverter(allowed_formats=[InputFormat.PDF])
 
     def convert(
@@ -110,6 +131,7 @@ class PdfEngine:
         if max_num_pages is not None:
             convert_kwargs["max_num_pages"] = max_num_pages
 
+        started_at = _dt.datetime.now(_dt.timezone.utc)
         try:
             result: ConversionResult = self._converter.convert(
                 normalised,
@@ -125,6 +147,7 @@ class PdfEngine:
                     PdfEngineError(component="DocumentConverter", message=str(exc))
                 ],
             )
+        finished_at = _dt.datetime.now(_dt.timezone.utc)
 
         output = self._build_output(
             result,
@@ -136,6 +159,40 @@ class PdfEngine:
         if output.succeeded and output_dir is not None:
             pdf_dir = _resolve_pdf_dir(output_dir, normalised, result)
             output.output_dir = self._write_markdown(output, pdf_dir)
+
+            if self._save_artifacts:
+                try:
+                    artifacts = write_artifacts(result, pdf_dir)
+                    output.document_json = artifacts.document_json
+                    output.nodes_jsonl = artifacts.nodes_jsonl
+                    output.picture_images = artifacts.picture_images
+                    output.table_images = artifacts.table_images
+                except ArtifactsError as exc:
+                    _log.warning("PdfEngine: artifacts not written: %s", exc)
+                    output.errors.append(
+                        PdfEngineError(component="artifacts", message=str(exc))
+                    )
+
+                output.run_json = write_run_snapshot(
+                    pdf_dir,
+                    source=normalised,
+                    source_kind=kind.value,
+                    status=str(output.status),
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    engine_config=self._engine_config,
+                    pipeline_options=(
+                        self._pipeline_options.model_dump(
+                            mode="json", serialize_as_any=True
+                        )
+                        if self._pipeline_options is not None
+                        else None
+                    ),
+                    page_count=output.page_count,
+                    pictures_extracted=len(output.picture_images),
+                    tables_extracted=len(output.table_images),
+                    errors=[e.model_dump() for e in output.errors],
+                )
 
             if make_html_preview:
                 try:

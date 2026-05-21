@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -58,7 +59,7 @@ def test_pdf_engine_converts_local_fixture(tmp_path: Path) -> None:
     Verifies the wrapper's contract: status, source classification, page
     summaries, and markdown export are populated and internally consistent.
     """
-    engine = PdfEngine()
+    engine = PdfEngine(save_artifacts=False)
     output: PdfConversionOutput = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -95,7 +96,7 @@ def test_pdf_engine_converts_local_fixture(tmp_path: Path) -> None:
 )
 def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
     """End-to-end: page images are retained and an HTML preview is written."""
-    engine = PdfEngine(with_page_images=True, images_scale=1.0)
+    engine = PdfEngine(with_page_images=True, images_scale=1.0, save_artifacts=False)
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path, make_html_preview=True)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -124,7 +125,7 @@ def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
 )
 def test_pdf_engine_embeds_images_in_markdown(tmp_path: Path) -> None:
     """``embed_images=True`` produces a self-contained markdown file."""
-    engine = PdfEngine(embed_images=True, images_scale=1.0)
+    engine = PdfEngine(embed_images=True, images_scale=1.0, save_artifacts=False)
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -135,3 +136,55 @@ def test_pdf_engine_embeds_images_in_markdown(tmp_path: Path) -> None:
     # (Some fixtures may have no pictures at all — accept that case too.)
     if "![" in output.markdown:
         assert "data:image" in output.markdown
+
+
+@pytest.mark.skipif(
+    not FIXTURE_PDF.exists(),
+    reason=f"fixture {FIXTURE_PDF} not available",
+)
+def test_pdf_engine_writes_artifacts(tmp_path: Path) -> None:
+    """``save_artifacts=True`` writes document.json, nodes.jsonl, and images."""
+    engine = PdfEngine(images_scale=1.0, save_artifacts=True)
+    output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
+
+    assert output.succeeded, f"conversion failed: {output.errors}"
+    pdf_dir = tmp_path / FIXTURE_PDF.stem
+
+    assert output.document_json == pdf_dir / "document.json"
+    assert output.document_json.exists()
+    doc = json.loads(output.document_json.read_text(encoding="utf-8"))
+    assert isinstance(doc, dict) and doc  # non-empty JSON object
+
+    assert output.nodes_jsonl == pdf_dir / "nodes.jsonl"
+    assert output.nodes_jsonl.exists()
+    lines = output.nodes_jsonl.read_text(encoding="utf-8").splitlines()
+    assert lines, "nodes.jsonl should not be empty"
+    sample = json.loads(lines[0])
+    # Every node carries our kind/level annotations and a label.
+    assert "_kind" in sample and "_level" in sample and "label" in sample
+
+    # All referenced images actually exist on disk.
+    for img_path in output.picture_images + output.table_images:
+        assert img_path.exists()
+        assert img_path.stat().st_size > 0
+        assert img_path.parent == pdf_dir / "images"
+
+    # run.json captures the per-conversion snapshot for reproducibility.
+    assert output.run_json == pdf_dir / "run.json"
+    assert output.run_json.exists()
+    run = json.loads(output.run_json.read_text(encoding="utf-8"))
+    for key in (
+        "schema_version",
+        "source",
+        "status",
+        "timing",
+        "engine_config",
+        "pipeline_options",
+        "models",
+        "environment",
+        "output_summary",
+    ):
+        assert key in run, f"run.json missing '{key}'"
+    assert run["timing"]["duration_seconds"] > 0
+    assert run["environment"]["python"]
+    assert run["engine_config"]["save_artifacts"] is True

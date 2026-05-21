@@ -5,7 +5,9 @@ This subpackage is project-local (not upstream Docling). Phase 1 ships
 that returns a validated :class:`PdfConversionOutput` Pydantic model.
 """
 
+from docling.engines.artifacts import ArtifactPaths, ArtifactsError, write_artifacts
 from docling.engines.pdf_engine import PdfEngine
+from docling.engines.run_snapshot import write_run_snapshot
 from docling.engines.schemas import (
     PageSummary,
     PdfConversionOutput,
@@ -15,6 +17,8 @@ from docling.engines.schemas import (
 from docling.engines.visualizer import PreviewError, render_html_preview
 
 __all__ = [
+    "ArtifactPaths",
+    "ArtifactsError",
     "PageSummary",
     "PdfConversionOutput",
     "PdfEngine",
@@ -22,4 +26,6 @@ __all__ = [
     "PreviewError",
     "SourceKind",
     "render_html_preview",
+    "write_artifacts",
+    "write_run_snapshot",
 ]

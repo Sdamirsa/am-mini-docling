@@ -22,6 +22,13 @@ Structured extraction (beta): [`docling/document_extractor.py`](../docling/docum
 docling/
 ├── document_converter.py    # main entry: DocumentConverter
 ├── document_extractor.py    # structured info extraction (beta)
+├── engines/                 # ⭐ Amir Engine (project-local, not upstream Docling)
+│   ├── pdf_engine.py        #   thin facade over DocumentConverter
+│   ├── schemas.py           #   PdfConversionOutput, PageSummary, PdfEngineError
+│   ├── validation.py        #   classify_source / validate_pdf_source
+│   ├── artifacts.py         #   write_artifacts → document.json + nodes.jsonl + image crops
+│   ├── run_snapshot.py      #   write_run_snapshot → run.json (env + timing + models)
+│   └── visualizer.py        #   render_html_preview → clickable bbox viewer
 ├── backend/                 # format parsers (one per input type)
 │   ├── pdf_backend.py, docling_parse_v4_backend.py, pypdfium2_backend.py
 │   ├── html_backend.py, md_backend.py, msword_backend.py, msexcel_backend.py
@@ -54,6 +61,10 @@ docling/
 | Bounding boxes / page layout | `DoclingDocument` items expose `prov` with bbox + page | [`docling/datamodel/document.py`](../docling/datamodel/document.py) |
 | Structured info extraction | `DocumentExtractor` (beta) | [`docling/document_extractor.py`](../docling/document_extractor.py) |
 | Pydantic-typed options | `pipeline_options.py`, `extraction_options.py` | [`docling/datamodel/`](../docling/datamodel/) |
+| **Single-call PDF pipeline (Amir)** | `PdfEngine` | [`docling/engines/pdf_engine.py`](../docling/engines/pdf_engine.py) |
+| **Per-PDF persistent artifacts** | `write_artifacts` | [`docling/engines/artifacts.py`](../docling/engines/artifacts.py) |
+| **Run reproducibility snapshot** | `write_run_snapshot` | [`docling/engines/run_snapshot.py`](../docling/engines/run_snapshot.py) |
+| **Clickable bbox preview** | `render_html_preview` | [`docling/engines/visualizer.py`](../docling/engines/visualizer.py) |
 
 ## Conventions to follow when extending
 
@@ -90,6 +101,27 @@ Amir Engine build through Phase 4. To restore ONNX-GPU on aarch64, install
 NVIDIA's Jetson `onnxruntime-gpu` wheel manually (Jetson Zoo) or patch
 `pyproject.toml` so `models-onnxruntime` falls back to CPU `onnxruntime` on
 aarch64.
+
+## Amir Engine usage (Phase 1)
+
+```python
+from pathlib import Path
+from docling.engines import PdfEngine
+
+out = PdfEngine(images_scale=1.5).convert(
+    Path("samples/test-pdf-ai-manuscript.pdf"),
+    output_dir=Path("samples/out"),
+    make_html_preview=True,
+)
+# samples/out/<pdf-stem>/{<pdf-stem>.md, document.json, nodes.jsonl, run.json,
+#   images/page_*.png, images/picture_*.png, images/table_*.png, preview.html}
+```
+
+`PdfEngine` flags:
+- `save_artifacts=True` (default) — writes `document.json` + `nodes.jsonl` + figure/table crops + `run.json`. Auto-enables page + picture image generation.
+- `embed_images=True` — markdown is standalone (base64 data URIs).
+- `with_page_images=True` — explicit; redundant when `save_artifacts=True`.
+- `images_scale=1.5` — image render scale.
 
 ## External docs
 
