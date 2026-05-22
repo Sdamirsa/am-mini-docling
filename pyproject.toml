@@ -70,6 +70,7 @@ changelog = "https://github.com/docling-project/docling/blob/main/CHANGELOG.md"
 [project.scripts]
 docling = "docling.cli.main:app"
 docling-tools = "docling.cli.tools:app"
+amir-batch = "docling.engines.cli:app"
 
 [project.optional-dependencies]
 # ============================================================================

@@ -27,8 +27,13 @@ docling/
 │   ├── schemas.py           #   PdfConversionOutput, PageSummary, PdfEngineError
 │   ├── validation.py        #   classify_source / validate_pdf_source
 │   ├── artifacts.py         #   write_artifacts → document.json + nodes.jsonl + image crops
+│   ├── chunker.py           #   write_chunks → chunks.jsonl (HybridChunker)
+│   ├── structured_outputs.py # write_structured_outputs → tables.jsonl + figures.jsonl
+│   ├── picture_filter.py    #   classify_pictures → noise flags (logos/banners)
+│   ├── vlm_specs.py         #   build_picture_description_options (incl. Qwen2.5-VL-3B vLLM)
+│   ├── compare_pipelines.py #   run_comparison → standard/ vs full_page_vlm/
 │   ├── run_snapshot.py      #   write_run_snapshot → run.json (env + timing + models)
-│   └── visualizer.py        #   render_html_preview → clickable bbox viewer
+│   └── visualizer.py        #   render_html_preview → clickable bbox viewer w/ side panel
 ├── backend/                 # format parsers (one per input type)
 │   ├── pdf_backend.py, docling_parse_v4_backend.py, pypdfium2_backend.py
 │   ├── html_backend.py, md_backend.py, msword_backend.py, msexcel_backend.py
@@ -63,6 +68,11 @@ docling/
 | Pydantic-typed options | `pipeline_options.py`, `extraction_options.py` | [`docling/datamodel/`](../docling/datamodel/) |
 | **Single-call PDF pipeline (Amir)** | `PdfEngine` | [`docling/engines/pdf_engine.py`](../docling/engines/pdf_engine.py) |
 | **Per-PDF persistent artifacts** | `write_artifacts` | [`docling/engines/artifacts.py`](../docling/engines/artifacts.py) |
+| **HybridChunker → chunks.jsonl** | `write_chunks` | [`docling/engines/chunker.py`](../docling/engines/chunker.py) |
+| **Tables / figures clean JSON** | `write_structured_outputs` | [`docling/engines/structured_outputs.py`](../docling/engines/structured_outputs.py) |
+| **Noise picture filter** | `classify_pictures` | [`docling/engines/picture_filter.py`](../docling/engines/picture_filter.py) |
+| **Picture description VLM presets** | `build_picture_description_options` | [`docling/engines/vlm_specs.py`](../docling/engines/vlm_specs.py) |
+| **Standard vs full-page VLM A/B** | `run_comparison` | [`docling/engines/compare_pipelines.py`](../docling/engines/compare_pipelines.py) |
 | **Run reproducibility snapshot** | `write_run_snapshot` | [`docling/engines/run_snapshot.py`](../docling/engines/run_snapshot.py) |
 | **Clickable bbox preview** | `render_html_preview` | [`docling/engines/visualizer.py`](../docling/engines/visualizer.py) |
 
@@ -117,12 +127,26 @@ out = PdfEngine(images_scale=1.5).convert(
 #   images/page_*.png, images/picture_*.png, images/table_*.png, preview.html}
 ```
 
-`PdfEngine` flags:
-- `save_artifacts=True` (default) — writes `document.json` + `nodes.jsonl` + figure/table crops + `run.json`. Auto-enables page + picture image generation.
-- `link_images=True` (default) — primary `<stem>.md` rewrites `<!-- image -->` placeholders to `![](images/picture_NNN.png)` so markdown viewers render figures.
-- `embed_images=True` (default) — additionally writes `<stem>.embedded.md` with base64 data URIs (standalone, ~10–15× larger than the primary).
-- `with_page_images=True` — explicit; redundant when `save_artifacts=True`.
-- `images_scale=1.5` — image render scale.
+`PdfEngine` flags (Phase 1+2+3):
+- `save_artifacts=True` (default) — `document.json`, `nodes.jsonl`, `chunks.jsonl`, `tables.jsonl`, `figures.jsonl`, `run.json`, image crops. Auto-enables page + picture image generation.
+- `link_images=True` (default) — primary `<stem>.md` rewrites `<!-- image -->` placeholders to `![](images/picture_NNN.png)`.
+- `embed_images=True` (default) — additionally writes `<stem>.embedded.md` with base64 data URIs.
+- `filter_noise_pictures=True` (default) — flags logos / watermarks / repeated banners (classifier + bbox-repeat heuristic). Strips them from both markdown files; tags `is_noise` in `figures.jsonl`.
+- `chunk_tokenizer="sentence-transformers/all-MiniLM-L6-v2"`, `chunk_max_tokens=512` — chunker config.
+- `granite_vision_tables=False` — opt-in: swap TableFormer for Granite-Vision VLM table structure (~2B model).
+- `picture_description=None` — set to `"smolvlm"`, `"granite_vision"`, `"pixtral"`, `"qwen25_vl_3b"` to add VLM captions to figures. `picture_description_engine="vllm"` (default) | `"transformers"` | `"default"`.
+
+Compare standard vs. full-page VLM:
+```python
+from pathlib import Path
+from docling.engines import run_comparison
+run_comparison(
+    Path("samples/my-paper.pdf"),
+    Path("samples/out"),
+    vlm_preset="granite_docling",   # DocTags → comparable bundles
+)
+# writes samples/out/my-paper/{standard,full_page_vlm,comparison.md}
+```
 
 ## External docs
 

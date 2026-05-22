@@ -1,0 +1,248 @@
+"""Per-PDF ``tables.jsonl`` and ``figures.jsonl`` — agent-friendly views.
+
+These derive value-add fields from the ``DoclingDocument`` that ``nodes.jsonl``
+doesn't expose flat:
+
+* For tables: ``markdown`` / ``html`` renderings, cell offsets/spans, and a
+  resolved ``caption_text``.
+* For figures: ``vlm_caption`` (when picture description is on),
+  ``classifier_label`` (when picture classifier is on), and
+  ``caption_text`` resolved from caption refs.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from docling_core.types.doc import PictureItem, TableItem
+
+if TYPE_CHECKING:
+    from docling.datamodel.document import ConversionResult
+
+_log = logging.getLogger(__name__)
+
+_TABLES_FILENAME = "tables.jsonl"
+_FIGURES_FILENAME = "figures.jsonl"
+
+
+class StructuredOutputsError(RuntimeError):
+    """Raised when structured-output extraction cannot complete."""
+
+
+@dataclass
+class StructuredOutputPaths:
+    """Paths returned by :func:`write_structured_outputs`."""
+
+    tables_jsonl: Path | None
+    figures_jsonl: Path | None
+    table_count: int
+    figure_count: int
+
+
+def write_structured_outputs(
+    result: ConversionResult,
+    pdf_dir: Path,
+    *,
+    picture_image_paths: list[Path] | None = None,
+    table_image_paths: list[Path] | None = None,
+    picture_noise_flags: list | None = None,
+) -> StructuredOutputPaths:
+    """Write ``tables.jsonl`` + ``figures.jsonl`` if the doc has any of each.
+
+    ``picture_image_paths`` and ``table_image_paths`` come from the artifacts
+    writer (Phase 1) — passing them keeps the JSONL ``image_path`` field in
+    lockstep with the on-disk crops.
+    """
+    if result.document is None:
+        raise StructuredOutputsError("ConversionResult has no document.")
+
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    pic_paths = picture_image_paths or []
+    tbl_paths = table_image_paths or []
+    noise_flags = picture_noise_flags or []
+
+    table_rows: list[dict] = []
+    figure_rows: list[dict] = []
+    pic_idx = 0
+    tbl_idx = 0
+
+    for item, _level in result.document.iterate_items():
+        if isinstance(item, PictureItem):
+            img_path = pic_paths[pic_idx] if pic_idx < len(pic_paths) else None
+            flag = noise_flags[pic_idx] if pic_idx < len(noise_flags) else None
+            figure_rows.append(
+                _figure_row(item, pic_idx, result.document, img_path, pdf_dir, flag)
+            )
+            pic_idx += 1
+        elif isinstance(item, TableItem):
+            img_path = tbl_paths[tbl_idx] if tbl_idx < len(tbl_paths) else None
+            table_rows.append(
+                _table_row(item, tbl_idx, result.document, img_path, pdf_dir)
+            )
+            tbl_idx += 1
+
+    tables_path = (
+        _write_jsonl(pdf_dir / _TABLES_FILENAME, table_rows) if table_rows else None
+    )
+    figures_path = (
+        _write_jsonl(pdf_dir / _FIGURES_FILENAME, figure_rows) if figure_rows else None
+    )
+
+    _log.info(
+        "Structured outputs: %d tables, %d figures written under %s",
+        len(table_rows),
+        len(figure_rows),
+        pdf_dir,
+    )
+    return StructuredOutputPaths(
+        tables_jsonl=tables_path,
+        figures_jsonl=figures_path,
+        table_count=len(table_rows),
+        figure_count=len(figure_rows),
+    )
+
+
+def _write_jsonl(target: Path, rows: list[dict]) -> Path:
+    with target.open("w", encoding="utf-8") as fh:
+        for row in rows:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return target
+
+
+def _prov_block(item: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for prov in getattr(item, "prov", None) or []:
+        bbox = getattr(prov, "bbox", None)
+        out.append(
+            {
+                "page_no": getattr(prov, "page_no", None),
+                "bbox": bbox.model_dump(mode="json") if bbox is not None else None,
+                "charspan": list(getattr(prov, "charspan", []) or []),
+            }
+        )
+    return out
+
+
+def _safe_relative(p: Path | None, base: Path) -> str | None:
+    if p is None:
+        return None
+    try:
+        return p.relative_to(base).as_posix()
+    except ValueError:
+        return str(p)
+
+
+def _table_row(
+    item: TableItem,
+    index: int,
+    doc,
+    image_path: Path | None,
+    pdf_dir: Path,
+) -> dict[str, Any]:
+    try:
+        markdown = item.export_to_markdown(doc=doc)
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.warning("table %d markdown export failed: %s", index, exc)
+        markdown = None
+    try:
+        html = item.export_to_html(doc=doc, add_caption=False)
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.warning("table %d html export failed: %s", index, exc)
+        html = None
+
+    data = item.data
+    cells = [
+        {
+            "text": c.text,
+            "row_offset": [c.start_row_offset_idx, c.end_row_offset_idx],
+            "col_offset": [c.start_col_offset_idx, c.end_col_offset_idx],
+            "row_span": c.row_span,
+            "col_span": c.col_span,
+            "column_header": c.column_header,
+            "row_header": c.row_header,
+            "bbox": c.bbox.model_dump(mode="json") if c.bbox is not None else None,
+        }
+        for c in (data.table_cells if data is not None else [])
+    ]
+
+    return {
+        "index": index,
+        "self_ref": getattr(item, "self_ref", None),
+        "label": item.label.value if hasattr(item.label, "value") else str(item.label),
+        "prov": _prov_block(item),
+        "caption_text": item.caption_text(doc) if hasattr(item, "caption_text") else "",
+        "image_path": _safe_relative(image_path, pdf_dir),
+        "markdown": markdown,
+        "html": html,
+        "num_rows": data.num_rows if data is not None else 0,
+        "num_cols": data.num_cols if data is not None else 0,
+        "cells": cells,
+    }
+
+
+def _picture_annotation_caption(item: PictureItem) -> str | None:
+    """Pull the first VLM-generated description from ``annotations`` if present."""
+    for ann in getattr(item, "annotations", None) or []:
+        text = getattr(ann, "text", None)
+        kind = getattr(ann, "kind", None) or type(ann).__name__
+        if text and "description" in str(kind).lower():
+            return text
+    # Fallback: first annotation with text.
+    for ann in getattr(item, "annotations", None) or []:
+        text = getattr(ann, "text", None)
+        if text:
+            return text
+    return None
+
+
+def _picture_classifier_label(item: PictureItem) -> str | None:
+    """Pull the picture-classifier label if present."""
+    for ann in getattr(item, "annotations", None) or []:
+        kind = (getattr(ann, "kind", None) or type(ann).__name__).lower()
+        if "classification" in kind or "classifier" in kind:
+            preds = getattr(ann, "predicted_classes", None) or getattr(
+                ann, "predictions", None
+            )
+            if preds:
+                first = preds[0]
+                return getattr(first, "class_name", None) or getattr(
+                    first, "label", None
+                )
+    return None
+
+
+def _figure_row(
+    item: PictureItem,
+    index: int,
+    doc,
+    image_path: Path | None,
+    pdf_dir: Path,
+    noise_flag: Any | None = None,
+) -> dict[str, Any]:
+    refs = [
+        r.cref for r in (getattr(item, "references", None) or []) if hasattr(r, "cref")
+    ]
+    classifier_label = _picture_classifier_label(item) or (
+        getattr(noise_flag, "classifier_label", None) if noise_flag else None
+    )
+    return {
+        "index": index,
+        "self_ref": getattr(item, "self_ref", None),
+        "label": item.label.value if hasattr(item.label, "value") else str(item.label),
+        "prov": _prov_block(item),
+        "caption_text": item.caption_text(doc) if hasattr(item, "caption_text") else "",
+        "references": refs,
+        "image_path": _safe_relative(image_path, pdf_dir),
+        "vlm_caption": _picture_annotation_caption(item),
+        "classifier_label": classifier_label,
+        "is_noise": bool(getattr(noise_flag, "is_noise", False)),
+        "noise_reason": getattr(noise_flag, "noise_reason", None),
+        "annotations": [
+            ann.model_dump(mode="json", serialize_as_any=True)
+            for ann in (getattr(item, "annotations", None) or [])
+        ],
+    }

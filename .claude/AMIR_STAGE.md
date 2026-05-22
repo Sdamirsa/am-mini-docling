@@ -4,7 +4,7 @@ Live tracker for the build defined in [AMIR_TODO.md](AMIR_TODO.md). Keep entries
 
 ## Current phase
 
-**PHASE 1 — Foundation (PDF→Structured Conversion)** — **COMPLETE.** All 9 tests green; smoke-tested on `samples/test-pdf-ai-manuscript.pdf` (8 pages, 0 errors, 7 figures + 5 tables extracted, `run.json` captures env + timing + models).
+**PHASE 1 + 2 + 3 — Foundation + Chunking + VLM** — **COMPLETE.** 13 tests green; smoke-tested on `samples/test-pdf-ai-manuscript.pdf` (8 pages, 0 errors, 7 figures, 5 tables, 50 chunks, journal-logo correctly flagged as noise and stripped from both markdown files).
 
 ### Phase 1 status
 
@@ -31,30 +31,44 @@ Two paths were quietly corrected during implementation:
 
 Reason: `docling/models/` holds upstream's ML-model wrappers (layout, OCR, VLM); putting Pydantic data schemas there is a naming collision waiting to happen. Same logic for `docling/utils/`. Keeping all Amir Engine code under `docling/engines/` makes future upstream merges easier.
 
-## Per-PDF output layout (Phase 1 deliverable)
+## Per-PDF output layout (Phase 1+2+3 deliverable)
 
 ```
 out/<pdf-stem>/
-├── <pdf-stem>.md            # primary markdown (image placeholders → ![](images/picture_NNN.png))
-├── <pdf-stem>.embedded.md   # standalone companion with base64-inlined images (when embed_images=True)
+├── <pdf-stem>.md            # primary markdown (noise stripped; ![](images/picture_NNN.png) refs)
+├── <pdf-stem>.embedded.md   # standalone — base64-inlined images (when embed_images=True, default)
 ├── document.json            # full DoclingDocument (round-trippable)
-├── nodes.jsonl              # one JSON object per node: label, prov/bbox, text,
-│                            # captions, table data, _kind, _level, image_path
-├── run.json                 # schema_version, source, status, timing,
-│                            # engine_config, pipeline_options, models summary,
-│                            # environment, output_summary, errors
+├── nodes.jsonl              # one JSON object per node from iterate_items()
+├── chunks.jsonl             # HybridChunker output: index, text, token_count, headings, page_nos, self_refs
+├── tables.jsonl             # one TableItem per row: caption_text, markdown, html, flat cells (with spans), dims
+├── figures.jsonl            # one PictureItem per row: caption_text, image_path, vlm_caption, classifier_label, is_noise/noise_reason
+├── run.json                 # env + timing + engine_config + pipeline_options (incl. model_spec) + packages
 ├── images/
 │   ├── page_NNNN.png        # page renders
-│   ├── picture_NNN.png      # PictureItem.get_image() crops
+│   ├── picture_NNN.png      # PictureItem.get_image() crops (ALL pictures kept; noise just tagged)
 │   └── table_NNN.png        # TableItem.get_image() crops
-└── preview.html             # bbox viewer — click any box for full node metadata
+└── preview.html             # bbox viewer — summary chips + clickable formatted side panel
 ```
 
-`PdfEngine(save_artifacts=True)` (default) auto-enables `generate_page_images` + `generate_picture_images` so the figure/table crops are available.
+For the optional full-page-VLM A/B run (``compare_pipelines.run_comparison``):
+
+```
+out/<pdf-stem>/
+├── standard/                # full PdfEngine bundle as above
+├── full_page_vlm/           # same shape, produced via VlmPipeline (default GraniteDocling)
+└── comparison.md            # side-by-side stats + first lines of each markdown
+```
+
+`PdfEngine(save_artifacts=True)` (default) auto-enables `generate_page_images` + `generate_picture_images`; `filter_noise_pictures=True` (default) auto-enables `do_picture_classification` so journal logos / repeated banners are tagged.
 
 ## Next action
 
-Move to **PHASE 2 — Content Extraction (Text / Image / Table)** per [AMIR_TODO.md](AMIR_TODO.md). Phase 1 already persists the raw node graph (`nodes.jsonl`) + extracted figure/table images — Phase 2's job is to *consume* those artifacts and emit a hierarchical text + image + table data product (sectioned text, captioned images with metadata, cell-level tables) ready for VLM (Phase 3) and LLM (Phase 4) layers.
+Phases 1–3 are done. Pipelines produce a clean, agent-readable bundle per PDF (text via chunks, structured tables, structured figures with optional VLM captions). Phase 4 (LLM context enrichment) was **dropped** by design; downstream consumers can run their own LLM over `chunks.jsonl` + `figures.jsonl` + `tables.jsonl` if they want summaries/topics/metadata.
+
+Open items for future work (not active):
+- Pull GraniteDocling table-structure and Qwen2.5-VL-3B picture description through a real GPU run end-to-end and pin numbers in `run.json`.
+- Phase 5 (FastAPI + CLI exposing `PdfEngine.convert` and `run_comparison`) when batch-processing demand appears.
+- Tokenizer/model swap to Qwen3-Embedding-4B + Qwen3-VL (see "Future considerations" in AMIR_TODO).
 
 ## Log
 
@@ -71,6 +85,13 @@ Move to **PHASE 2 — Content Extraction (Text / Image / Table)** per [AMIR_TODO
 | 2026-05-21 | 1 | **Clickable preview** landed: viewer now draws one bbox per `DocItem`, click opens side panel with full node JSON. Esc clears selection. |
 | 2026-05-21 | 1 | **Run snapshot** landed: `docling/engines/run_snapshot.py` writes `run.json` per PDF (env, timing, models, full pipeline_options). `tach.toml` gained a `docling.engines` module entry. 9/9 tests green; `make validate` clean. |
 | 2026-05-21 | 1 | **Linked + standalone markdown** landed: primary `.md` rewrites `<!-- image -->` placeholders to `![](images/picture_NNN.png)` refs (matches `nodes.jsonl.image_path`); `embed_images=True` (now default) additionally writes `<stem>.embedded.md` with base64 images. Manuscript smoke: primary 55 KB / 0 placeholders, embedded 697 KB / 7 base64 figures. |
+| 2026-05-21 | 2 | **HybridChunker integration** landed: `docling/engines/chunker.py` writes `chunks.jsonl` (50 chunks on manuscript). Tokenizer = `sentence-transformers/all-MiniLM-L6-v2`, max_tokens=512. Auto-on with `save_artifacts=True`. |
+| 2026-05-21 | 2 | **Structured outputs** landed: `tables.jsonl` (caption_text + markdown + html + flat cells with row/col offsets/spans) and `figures.jsonl` (caption_text + image_path + vlm_caption + classifier_label) via `docling/engines/structured_outputs.py`. |
+| 2026-05-21 | 3 | **Granite-Vision tables** flag landed (opt-in; downloads a 2B model on first use). |
+| 2026-05-21 | 3 | **Picture description VLM** wired: `PdfEngine(picture_description="qwen25_vl_3b", picture_description_engine="vllm")` builds `PictureDescriptionVlmEngineOptions` + `VllmVlmEngineOptions` pointing at `Qwen/Qwen2.5-VL-3B-Instruct`. Captions land in `figures.jsonl[*].vlm_caption`. Custom Qwen spec lives in `docling/engines/vlm_specs.py` (Docling's bundled Qwen preset is MLX-only). |
+| 2026-05-21 | 3 | **Picture noise filter** landed (default-on): `docling/engines/picture_filter.py` classifies logos / watermarks / repeated banners via classifier labels + bbox-repeat heuristic. Auto-enables `do_picture_classification`. On the manuscript, correctly tagged the *European Journal of Radiology* running logo as `classifier:logo` (1 of 7 pictures). Noise pictures are stripped from both `<stem>.md` and `<stem>.embedded.md` (replaced with `<!-- noise picture: reason -->`). |
+| 2026-05-21 | 3 | **Full-page VLM comparison runner** landed: `docling/engines/compare_pipelines.py::run_comparison()` writes `out/<stem>/{standard,full_page_vlm,comparison.md}`. Default uses `GRANITEDOCLING_TRANSFORMERS` (DocTags → comparable bundles). |
+| 2026-05-21 | 3 | **HTML preview extended**: summary chips (pages / figures / tables / chunks / noise), per-kind formatted side panel (picture: caption + VLM description + classifier + thumbnail; table: dims + rendered HTML; text: body text), noise pictures rendered dashed gray with badge. Raw JSON still available via collapsible toggle. |
 
 ## Blockers
 

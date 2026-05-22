@@ -81,6 +81,18 @@ class PdfConversionOutput(BaseModel):
         None,
         description="Path to the per-node JSONL, when artifacts were written.",
     )
+    chunks_jsonl: Path | None = Field(
+        None,
+        description="Path to the HybridChunker chunks JSONL, when chunking ran.",
+    )
+    tables_jsonl: Path | None = Field(
+        None,
+        description="Path to ``tables.jsonl`` — one row per TableItem (markdown + html + flat cells with spans + caption + image_path).",
+    )
+    figures_jsonl: Path | None = Field(
+        None,
+        description="Path to ``figures.jsonl`` — one row per PictureItem (caption_text + vlm_caption + classifier_label + image_path).",
+    )
     run_json: Path | None = Field(
         None,
         description="Path to the run snapshot (env, timing, config, models).",

@@ -2,10 +2,20 @@
 
 Produces a single ``preview.html`` (plus one PNG per page) showing each page
 image with absolutely-positioned overlays — one per :class:`DocItem` from
-:meth:`DoclingDocument.iterate_items`. Hover surfaces a short label tag;
-clicking a box opens a side panel with the node's full metadata
-(self_ref, label, level, prov/bbox, text, captions, table data, …) — the
-same data that's persisted to ``nodes.jsonl``.
+:meth:`DoclingDocument.iterate_items`.
+
+UI:
+
+* Top header carries summary stats (pages, figures, tables, chunks).
+* Hover shows the node's label as a small tag.
+* Click any bbox to open the side panel — formatted for **the kind of
+  node**: pictures show caption + VLM description + classifier label +
+  image thumbnail; tables show caption + dimensions + the rendered HTML
+  table; text shows the heading path + body text. Raw JSON is available
+  via a collapsible "Show raw" toggle.
+* Noise-flagged pictures (journal logos, repeated banners) render with a
+  dashed gray border and a ``noise`` badge so a reviewer can spot them
+  at a glance.
 """
 
 from __future__ import annotations
@@ -15,12 +25,14 @@ import json
 import logging
 from pathlib import Path
 
+from docling_core.types.doc import PictureItem, TableItem
+
 from docling.datamodel.base_models import ConversionStatus, Page
 from docling.datamodel.document import ConversionResult
+from docling.engines.picture_filter import PictureNoiseFlag
 
 _log = logging.getLogger(__name__)
 
-# DocItemLabel → CSS colour. Anything not listed falls back to LABEL_DEFAULT.
 LABEL_COLOURS: dict[str, str] = {
     "title": "#d62728",
     "section_header": "#ff7f0e",
@@ -51,6 +63,8 @@ def render_html_preview(
     *,
     image_scale: float = 1.5,
     page_image_subdir: str = "images",
+    noise_flags: list[PictureNoiseFlag] | None = None,
+    chunks_jsonl: Path | None = None,
 ) -> Path:
     """Render an HTML viewer for *result* into *target_dir*."""
     if result.status not in {
@@ -69,13 +83,21 @@ def render_html_preview(
     images_dir = target_dir / page_image_subdir
     images_dir.mkdir(exist_ok=True)
 
-    items_by_page = _index_items_by_page(result)
+    noise_by_self_ref: dict[str, PictureNoiseFlag] = {}
+    for flag in noise_flags or []:
+        if flag.self_ref:
+            noise_by_self_ref[flag.self_ref] = flag
+
+    counters = {"picture": 0, "table": 0}
+    indexed = _index_items_by_page(result, noise_by_self_ref, counters, target_dir)
+
+    summary = _summary_block(result, indexed, len(noise_by_self_ref), chunks_jsonl)
 
     page_blocks: list[str] = []
     for page in result.pages:
         page_block = _render_page_block(
             page,
-            items_by_page.get(page.page_no, []),
+            indexed.get(page.page_no, []),
             images_dir,
             image_scale=image_scale,
         )
@@ -89,6 +111,7 @@ def render_html_preview(
 
     html_doc = _HTML_TEMPLATE.format(
         title=html.escape(result.input.file.name if result.input else "preview"),
+        summary=summary,
         legend=_render_legend(),
         pages="\n".join(page_blocks),
     )
@@ -99,14 +122,157 @@ def render_html_preview(
     return target
 
 
-def _index_items_by_page(result: ConversionResult) -> dict[int, list[tuple]]:
-    """Group ``iterate_items()`` output by page (one entry per prov)."""
+def _summary_block(
+    result: ConversionResult,
+    indexed: dict[int, list[tuple]],
+    noise_count: int,
+    chunks_jsonl: Path | None,
+) -> str:
+    pages = len(result.pages)
+    pictures = sum(
+        1 for ents in indexed.values() for e in ents if e[4]["kind"] == "picture"
+    )
+    tables = sum(
+        1 for ents in indexed.values() for e in ents if e[4]["kind"] == "table"
+    )
+    chunks = 0
+    if chunks_jsonl is not None and chunks_jsonl.exists():
+        with chunks_jsonl.open() as fh:
+            chunks = sum(1 for _ in fh)
+
+    chips = [
+        f'<span class="chip">{pages}<small>pages</small></span>',
+        f'<span class="chip chip-picture">{pictures}<small>figures</small></span>',
+        f'<span class="chip chip-table">{tables}<small>tables</small></span>',
+        f'<span class="chip chip-chunk">{chunks}<small>chunks</small></span>',
+    ]
+    if noise_count:
+        chips.append(
+            f'<span class="chip chip-noise">{noise_count}<small>noise</small></span>'
+        )
+    return f'<div class="summary">{"".join(chips)}</div>'
+
+
+def _index_items_by_page(
+    result: ConversionResult,
+    noise_by_self_ref: dict[str, PictureNoiseFlag],
+    counters: dict[str, int],
+    pdf_dir: Path,
+) -> dict[int, list[tuple]]:
     by_page: dict[int, list[tuple]] = {}
     for item, level in result.document.iterate_items():
+        display = _display_metadata(
+            item, result.document, noise_by_self_ref, counters, pdf_dir
+        )
         prov_list = getattr(item, "prov", None) or []
         for prov_idx, prov in enumerate(prov_list):
-            by_page.setdefault(prov.page_no, []).append((item, level, prov_idx, prov))
+            by_page.setdefault(prov.page_no, []).append(
+                (item, level, prov_idx, prov, display)
+            )
     return by_page
+
+
+def _display_metadata(
+    item,
+    doc,
+    noise_by_self_ref: dict[str, PictureNoiseFlag],
+    counters: dict[str, int],
+    pdf_dir: Path,
+) -> dict:
+    """Compute the data the side-panel renders for this item."""
+    kind = (
+        "picture"
+        if isinstance(item, PictureItem)
+        else "table"
+        if isinstance(item, TableItem)
+        else "text"
+    )
+    label = item.label.value if hasattr(item.label, "value") else str(item.label)
+    self_ref = getattr(item, "self_ref", "") or ""
+    raw = item.model_dump(mode="json", exclude={"image"})
+
+    info: dict = {
+        "kind": kind,
+        "label": label,
+        "self_ref": self_ref,
+        "raw": raw,
+    }
+
+    if kind == "picture":
+        counters["picture"] += 1
+        idx = counters["picture"]
+        flag = noise_by_self_ref.get(self_ref)
+        info.update(
+            {
+                "image_path": f"images/picture_{idx:03d}.png",
+                "caption_text": _caption_text(item, doc),
+                "vlm_caption": _picture_vlm_caption(item),
+                "classifier_label": _picture_classifier_label(item),
+                "is_noise": bool(getattr(flag, "is_noise", False)),
+                "noise_reason": getattr(flag, "noise_reason", None),
+            }
+        )
+    elif kind == "table":
+        counters["table"] += 1
+        idx = counters["table"]
+        try:
+            table_html = item.export_to_html(doc=doc, add_caption=False)
+        except Exception:
+            table_html = None
+        data = item.data
+        info.update(
+            {
+                "image_path": f"images/table_{idx:03d}.png",
+                "caption_text": _caption_text(item, doc),
+                "num_rows": data.num_rows if data is not None else 0,
+                "num_cols": data.num_cols if data is not None else 0,
+                "table_html": table_html,
+            }
+        )
+    else:
+        info.update(
+            {
+                "text": getattr(item, "text", "") or "",
+            }
+        )
+    return info
+
+
+def _caption_text(item, doc) -> str:
+    if hasattr(item, "caption_text"):
+        try:
+            return item.caption_text(doc) or ""
+        except Exception:
+            return ""
+    return ""
+
+
+def _picture_vlm_caption(item) -> str | None:
+    for ann in getattr(item, "annotations", None) or []:
+        text = getattr(ann, "text", None)
+        kind = (getattr(ann, "kind", None) or type(ann).__name__).lower()
+        if text and "description" in kind:
+            return text
+    for ann in getattr(item, "annotations", None) or []:
+        text = getattr(ann, "text", None)
+        if text:
+            return text
+    return None
+
+
+def _picture_classifier_label(item) -> str | None:
+    for ann in getattr(item, "annotations", None) or []:
+        kind = (getattr(ann, "kind", None) or type(ann).__name__).lower()
+        if "classification" in kind or "classifier" in kind:
+            preds = getattr(ann, "predicted_classes", None) or getattr(
+                ann, "predictions", None
+            )
+            if preds:
+                first = preds[0]
+                return getattr(first, "class_name", None) or getattr(
+                    first, "label", None
+                )
+    return None
 
 
 def _render_page_block(
@@ -133,10 +299,11 @@ def _render_page_block(
             level,
             prov_idx,
             prov,
+            display,
             page_height=page.size.height,
             image_scale=image_scale,
         )
-        for (item, level, prov_idx, prov) in page_items
+        for (item, level, prov_idx, prov, display) in page_items
     )
 
     rel_image = image_path.relative_to(images_dir.parent).as_posix()
@@ -158,6 +325,7 @@ def _render_overlay(
     level: int,
     prov_idx: int,
     prov,
+    display: dict,
     *,
     page_height: float,
     image_scale: float,
@@ -168,34 +336,31 @@ def _render_overlay(
     width = (tl.r - tl.l) * image_scale
     height = (tl.b - tl.t) * image_scale
 
-    label_value = item.label.value if hasattr(item.label, "value") else str(item.label)
+    label_value = display["label"]
     colour = LABEL_COLOURS.get(label_value, LABEL_DEFAULT)
 
-    node = _node_to_dict(item, level)
-    node["_prov_index"] = prov_idx
-    node_json = html.escape(json.dumps(node, ensure_ascii=False, indent=2))
+    payload = {**display, "_level": level, "_prov_index": prov_idx}
+    payload_json = html.escape(json.dumps(payload, ensure_ascii=False))
 
-    self_ref = getattr(item, "self_ref", "") or ""
-    tag_label = label_value
+    css_classes = ["bbox"]
+    if display.get("is_noise"):
+        css_classes.append("bbox-noise")
+    noise_badge = (
+        '<span class="bbox-noise-badge">noise</span>' if display.get("is_noise") else ""
+    )
+    class_attr = " ".join(css_classes)
 
     return (
-        f'<div class="bbox" data-label="{html.escape(label_value)}" '
-        f'data-self-ref="{html.escape(self_ref)}" '
-        f'data-meta="{node_json}" '
+        f'<div class="{class_attr}" data-label="{html.escape(label_value)}" '
+        f'data-self-ref="{html.escape(display["self_ref"])}" '
+        f'data-payload="{payload_json}" '
         f'style="left:{left:.1f}px; top:{top:.1f}px; '
         f"width:{width:.1f}px; height:{height:.1f}px; "
         f'border-color:{colour}; background-color:{colour}22;">'
-        f'<span class="bbox-tag" style="background:{colour};">{html.escape(tag_label)}</span>'
+        f'<span class="bbox-tag" style="background:{colour};">{html.escape(label_value)}</span>'
+        f"{noise_badge}"
         f"</div>"
     )
-
-
-def _node_to_dict(item, level: int) -> dict:
-    """Serialise a document item to a JSON-friendly dict (matches artifacts.py)."""
-    dumped = item.model_dump(mode="json", exclude={"image"})
-    dumped["_kind"] = type(item).__name__
-    dumped["_level"] = level
-    return dumped
 
 
 def _render_legend() -> str:
@@ -234,12 +399,23 @@ _HTML_TEMPLATE = """<!doctype html>
   }}
   header h1 {{ margin: 0; font-size: 16px; font-weight: 600; }}
   header .hint {{ color: #777; font-size: 12px; margin-top: 4px; }}
+  .summary {{ display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }}
+  .chip {{
+    display: inline-flex; align-items: baseline; gap: 4px;
+    padding: 4px 10px; border-radius: 12px; background: #eef0f3;
+    font-size: 13px; font-weight: 600;
+  }}
+  .chip small {{ font-weight: 400; color: #666; font-size: 11px; }}
+  .chip-picture {{ background: #fce4ec; }}
+  .chip-table {{ background: #e8f5e9; }}
+  .chip-chunk {{ background: #e3f2fd; }}
+  .chip-noise {{ background: #f5f5f5; color: #888; }}
   .legend {{ margin-top: 8px; font-size: 12px; display: flex; flex-wrap: wrap; gap: 12px; }}
   .legend-item {{ display: inline-flex; align-items: center; gap: 4px; }}
   .legend-swatch {{
     display: inline-block; width: 12px; height: 12px; border-radius: 2px;
   }}
-  main {{ padding: 20px; padding-right: 440px; }}
+  main {{ padding: 20px; padding-right: 480px; }}
   section.page {{
     background: #fff; margin: 0 auto 32px; padding: 16px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-radius: 4px; width: max-content;
@@ -259,30 +435,39 @@ _HTML_TEMPLATE = """<!doctype html>
     background-color: rgba(255, 200, 0, 0.55) !important;
     z-index: 6; outline: 2px solid #000;
   }}
+  .bbox.bbox-noise {{
+    border-style: dashed !important; border-color: #888 !important;
+    background-color: rgba(150, 150, 150, 0.06) !important; opacity: 0.85;
+  }}
   .bbox-tag {{
     position: absolute; top: -16px; left: -2px; padding: 1px 4px;
     color: #fff; font-size: 9px; font-weight: 600;
     border-radius: 2px 2px 0 0; white-space: nowrap; opacity: 0.85;
     pointer-events: none;
   }}
+  .bbox-noise-badge {{
+    position: absolute; bottom: -14px; right: -2px; padding: 1px 4px;
+    color: #555; background: #fff; border: 1px solid #aaa;
+    font-size: 9px; font-weight: 600; border-radius: 2px;
+    pointer-events: none;
+  }}
   #panel {{
-    position: fixed; top: 0; right: 0; width: 420px; height: 100vh;
+    position: fixed; top: 0; right: 0; width: 460px; height: 100vh;
     background: #fff; border-left: 1px solid #ddd; box-shadow: -2px 0 6px rgba(0,0,0,0.05);
     display: flex; flex-direction: column; z-index: 20;
   }}
-  #panel header {{
-    position: static; padding: 12px 16px; background: #fafafa;
+  #panel-header {{
+    padding: 12px 16px; background: #fafafa;
     border-bottom: 1px solid #eee; flex-shrink: 0;
   }}
-  #panel header h2 {{ margin: 0; font-size: 14px; font-weight: 600; color: #333; }}
-  #panel header .self-ref {{
+  #panel-header h2 {{ margin: 0; font-size: 14px; font-weight: 600; color: #333; }}
+  #panel-header .self-ref {{
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 11px; color: #666; margin-top: 2px;
   }}
   #panel-body {{
     flex: 1; overflow: auto; padding: 12px 16px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    font-size: 13px; line-height: 1.5;
   }}
   #panel-empty {{ color: #888; font-style: italic; }}
   #panel-close {{
@@ -290,25 +475,56 @@ _HTML_TEMPLATE = """<!doctype html>
     color: #888; font-size: 16px; padding: 0; margin-left: 8px;
   }}
   #panel-close:hover {{ color: #222; }}
+  .panel-field {{ margin-bottom: 10px; }}
+  .panel-field-label {{
+    font-size: 11px; font-weight: 600; color: #666;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;
+  }}
+  .panel-field-value {{ word-break: break-word; }}
+  .panel-thumbnail {{
+    max-width: 100%; max-height: 240px; border: 1px solid #eee;
+    border-radius: 2px; margin-top: 4px;
+  }}
+  .panel-noise-banner {{
+    background: #fff8e1; border: 1px solid #f1c40f; color: #7a5b00;
+    padding: 6px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 12px;
+  }}
+  .panel-table {{
+    max-width: 100%; overflow: auto; border: 1px solid #eee;
+    border-radius: 2px; padding: 4px; background: #fafafa; font-size: 12px;
+  }}
+  .panel-table table {{ border-collapse: collapse; }}
+  .panel-table td, .panel-table th {{
+    border: 1px solid #ddd; padding: 2px 4px;
+  }}
+  details.panel-raw {{ margin-top: 14px; color: #666; font-size: 12px; }}
+  details.panel-raw summary {{ cursor: pointer; }}
+  details.panel-raw pre {{
+    background: #f7f7f7; border: 1px solid #eee; padding: 8px;
+    border-radius: 2px; overflow: auto; max-height: 300px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+  }}
 </style>
 </head>
 <body>
 <header>
   <h1>Docling preview — {title}</h1>
-  <div class="hint">Click any bounding box to inspect the full node metadata.</div>
+  <div class="hint">Click any bounding box to inspect node metadata. Dashed boxes are filtered as noise.</div>
+  {summary}
   {legend}
 </header>
 <main>
 {pages}
 </main>
 <aside id="panel">
-  <header>
+  <div id="panel-header">
     <button id="panel-close" title="Clear selection">&times;</button>
     <h2 id="panel-title">Node inspector</h2>
     <div class="self-ref" id="panel-self-ref"></div>
-  </header>
+  </div>
   <div id="panel-body">
-    <span id="panel-empty">Click a bounding box to see its full metadata here.</span>
+    <span id="panel-empty">Click a bounding box to see this node's data here.</span>
   </div>
 </aside>
 <script>
@@ -324,24 +540,68 @@ _HTML_TEMPLATE = """<!doctype html>
     selected = null;
     panelTitle.textContent = 'Node inspector';
     panelSelfRef.textContent = '';
-    panelBody.innerHTML = '<span id="panel-empty">Click a bounding box to see its full metadata here.</span>';
+    panelBody.innerHTML = '<span id="panel-empty">Click a bounding box to see this node\\'s data here.</span>';
+  }}
+
+  function field(label, value, opts) {{
+    if (value === null || value === undefined || value === '') return '';
+    opts = opts || {{}};
+    const safe = opts.raw ? value : escapeHtml(String(value));
+    return '<div class="panel-field"><div class="panel-field-label">' +
+      escapeHtml(label) + '</div><div class="panel-field-value">' + safe + '</div></div>';
+  }}
+
+  function escapeHtml(s) {{
+    return s.replace(/[&<>"']/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
+  }}
+
+  function renderPicture(data) {{
+    let html = '';
+    if (data.is_noise) {{
+      html += '<div class="panel-noise-banner">⚠ Flagged as noise: ' +
+        escapeHtml(data.noise_reason || 'unknown') + '. This picture is hidden from the markdown export.</div>';
+    }}
+    html += field('Caption', data.caption_text);
+    html += field('VLM description', data.vlm_caption);
+    html += field('Classifier label', data.classifier_label);
+    if (data.image_path) {{
+      html += field('Image', '<img class="panel-thumbnail" src="' + escapeHtml(data.image_path) + '"/>', {{raw: true}});
+    }}
+    return html;
+  }}
+
+  function renderTable(data) {{
+    let html = field('Caption', data.caption_text);
+    html += field('Dimensions', data.num_rows + ' rows by ' + data.num_cols + ' cols');
+    if (data.table_html) {{
+      html += field('Rendered table', '<div class="panel-table">' + data.table_html + '</div>', {{raw: true}});
+    }}
+    if (data.image_path) {{
+      html += field('Cropped image', '<img class="panel-thumbnail" src="' + escapeHtml(data.image_path) + '"/>', {{raw: true}});
+    }}
+    return html;
+  }}
+
+  function renderText(data) {{
+    return field('Text', data.text);
   }}
 
   function showNode(box) {{
     if (selected) selected.classList.remove('selected');
     box.classList.add('selected');
     selected = box;
-    const label = box.dataset.label || '(unlabelled)';
-    const selfRef = box.dataset.selfRef || '';
-    const meta = box.dataset.meta || '{{}}';
-    panelTitle.textContent = label;
-    panelSelfRef.textContent = selfRef;
-    try {{
-      const obj = JSON.parse(meta);
-      panelBody.textContent = JSON.stringify(obj, null, 2);
-    }} catch (e) {{
-      panelBody.textContent = meta;
-    }}
+    const payload = JSON.parse(box.dataset.payload || '{{}}');
+    panelTitle.textContent = payload.label || '(unlabelled)';
+    panelSelfRef.textContent = payload.self_ref || '';
+
+    let html = '';
+    if (payload.kind === 'picture') html = renderPicture(payload);
+    else if (payload.kind === 'table') html = renderTable(payload);
+    else html = renderText(payload);
+
+    html += '<details class="panel-raw"><summary>Show raw JSON</summary><pre>' +
+      escapeHtml(JSON.stringify(payload.raw, null, 2)) + '</pre></details>';
+    panelBody.innerHTML = html;
   }}
 
   document.querySelectorAll('.bbox').forEach(function(box) {{

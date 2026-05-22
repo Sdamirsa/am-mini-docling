@@ -219,3 +219,117 @@ def test_pdf_engine_writes_artifacts(tmp_path: Path) -> None:
     assert run["timing"]["duration_seconds"] > 0
     assert run["environment"]["python"]
     assert run["engine_config"]["save_artifacts"] is True
+
+
+@pytest.mark.skipif(
+    not FIXTURE_PDF.exists(),
+    reason=f"fixture {FIXTURE_PDF} not available",
+)
+def test_pdf_engine_writes_chunks(tmp_path: Path) -> None:
+    """``save_artifacts=True`` also produces ``chunks.jsonl`` via HybridChunker."""
+    engine = PdfEngine(
+        images_scale=1.0, save_artifacts=True, embed_images=False, chunk_max_tokens=512
+    )
+    output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
+
+    assert output.succeeded, f"conversion failed: {output.errors}"
+    pdf_dir = tmp_path / FIXTURE_PDF.stem
+    assert output.chunks_jsonl == pdf_dir / "chunks.jsonl"
+    assert output.chunks_jsonl.exists()
+
+    lines = output.chunks_jsonl.read_text(encoding="utf-8").splitlines()
+    assert lines, "chunks.jsonl should not be empty"
+    sample = json.loads(lines[0])
+    for key in ("index", "text", "token_count", "headings", "page_nos", "self_refs"):
+        assert key in sample, f"chunk row missing '{key}'"
+    # Token budget is respected by HybridChunker.
+    for raw in lines:
+        row = json.loads(raw)
+        if row["token_count"] is not None:
+            assert row["token_count"] <= 512
+
+
+@pytest.mark.skipif(
+    not FIXTURE_PDF.exists(),
+    reason=f"fixture {FIXTURE_PDF} not available",
+)
+def test_pdf_engine_picture_description_config() -> None:
+    """``picture_description`` wires the right pipeline_options without firing the VLM."""
+    from docling.datamodel.pipeline_options import (
+        PictureDescriptionVlmEngineOptions,
+    )
+
+    engine = PdfEngine(
+        save_artifacts=False,
+        embed_images=False,
+        picture_description="qwen25_vl_3b",
+        picture_description_engine="vllm",
+    )
+    opts = engine._pipeline_options
+    assert opts is not None
+    assert opts.do_picture_description is True
+    assert isinstance(
+        opts.picture_description_options, PictureDescriptionVlmEngineOptions
+    )
+    assert opts.picture_description_options.model_spec.default_repo_id == (
+        "Qwen/Qwen2.5-VL-3B-Instruct"
+    )
+
+
+def test_pdf_engine_granite_vision_tables_config() -> None:
+    """``granite_vision_tables=True`` swaps in the VLM table-structure options."""
+    from docling.datamodel.pipeline_options import GraniteVisionTableStructureOptions
+
+    engine = PdfEngine(
+        save_artifacts=False, embed_images=False, granite_vision_tables=True
+    )
+    assert isinstance(
+        engine._pipeline_options.table_structure_options,
+        GraniteVisionTableStructureOptions,
+    )
+
+
+@pytest.mark.skipif(
+    not FIXTURE_PDF.exists(),
+    reason=f"fixture {FIXTURE_PDF} not available",
+)
+def test_pdf_engine_writes_structured_outputs(tmp_path: Path) -> None:
+    """``tables.jsonl`` / ``figures.jsonl`` written only when items exist; rows align with image crops."""
+    engine = PdfEngine(images_scale=1.0, save_artifacts=True, embed_images=False)
+    output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
+    assert output.succeeded, f"conversion failed: {output.errors}"
+
+    if output.tables_jsonl is not None:
+        rows = [
+            json.loads(line) for line in output.tables_jsonl.read_text().splitlines()
+        ]
+        assert len(rows) == len(output.table_images)
+        for row in rows:
+            for key in (
+                "index",
+                "self_ref",
+                "prov",
+                "caption_text",
+                "markdown",
+                "num_rows",
+                "num_cols",
+                "cells",
+            ):
+                assert key in row
+
+    if output.figures_jsonl is not None:
+        rows = [
+            json.loads(line) for line in output.figures_jsonl.read_text().splitlines()
+        ]
+        assert len(rows) == len(output.picture_images)
+        for row in rows:
+            for key in (
+                "index",
+                "self_ref",
+                "prov",
+                "caption_text",
+                "image_path",
+                "vlm_caption",
+                "classifier_label",
+            ):
+                assert key in row

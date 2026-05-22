@@ -6,7 +6,14 @@ that returns a validated :class:`PdfConversionOutput` Pydantic model.
 """
 
 from docling.engines.artifacts import ArtifactPaths, ArtifactsError, write_artifacts
+from docling.engines.chunker import ChunkerError, ChunkPaths, write_chunks
+from docling.engines.compare_pipelines import ComparisonResult, run_comparison
 from docling.engines.pdf_engine import PdfEngine
+from docling.engines.picture_filter import (
+    DEFAULT_NOISE_CLASSES,
+    PictureNoiseFlag,
+    classify_pictures,
+)
 from docling.engines.run_snapshot import write_run_snapshot
 from docling.engines.schemas import (
     PageSummary,
@@ -14,18 +21,34 @@ from docling.engines.schemas import (
     PdfEngineError,
     SourceKind,
 )
+from docling.engines.structured_outputs import (
+    StructuredOutputPaths,
+    StructuredOutputsError,
+    write_structured_outputs,
+)
 from docling.engines.visualizer import PreviewError, render_html_preview
 
 __all__ = [
+    "DEFAULT_NOISE_CLASSES",
     "ArtifactPaths",
     "ArtifactsError",
+    "ChunkPaths",
+    "ChunkerError",
+    "ComparisonResult",
     "PageSummary",
     "PdfConversionOutput",
     "PdfEngine",
     "PdfEngineError",
+    "PictureNoiseFlag",
     "PreviewError",
     "SourceKind",
+    "StructuredOutputPaths",
+    "StructuredOutputsError",
+    "classify_pictures",
     "render_html_preview",
+    "run_comparison",
     "write_artifacts",
+    "write_chunks",
     "write_run_snapshot",
+    "write_structured_outputs",
 ]

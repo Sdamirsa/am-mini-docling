@@ -29,8 +29,11 @@ open samples/out/my-paper/preview.html       # macOS
 
 | File | Content |
 |---|---|
-| `<pdf-stem>.md` | Primary markdown. Image placeholders are rewritten to `![](images/picture_NNN.png)` relative refs so the file renders in any markdown viewer (controlled by `link_images=True`, default). |
-| `<pdf-stem>.embedded.md` | Standalone companion with images inlined as base64 data URIs — written when `embed_images=True` (default). Larger; share when you can't ship the `images/` folder. |
+| `<pdf-stem>.md` | Primary markdown. Image placeholders are rewritten to `![](images/picture_NNN.png)` relative refs (controlled by `link_images=True`, default). Pictures flagged as noise (logos, repeated banners) are stripped and replaced with `<!-- noise picture: reason -->`. |
+| `<pdf-stem>.embedded.md` | Standalone companion with images inlined as base64 (when `embed_images=True`, default). Same noise filtering applied. ~10–15× larger than primary. |
+| `chunks.jsonl` | `HybridChunker` output, one chunk per line: `{index, text, token_count, headings, page_nos, self_refs}`. RAG-ready. |
+| `tables.jsonl` | One row per table: caption, markdown rendering, HTML rendering, dimensions, flat cells with row/col offsets and spans, image_path. |
+| `figures.jsonl` | One row per figure: caption_text, image_path, **vlm_caption** (when picture description on), **classifier_label**, **is_noise** + **noise_reason**, raw annotations. |
 | `document.json` | Full `DoclingDocument` serialisation (canonical, round-trippable). |
 | `nodes.jsonl` | One JSON object per node from `iterate_items()` — label, bbox/page (`prov`), text, captions, table cells, plus `_kind`, `_level`, and `image_path` for pictures/tables. |
 | `run.json` | Reproducibility snapshot: schema version, source, status, timing, engine config, full `pipeline_options` (incl. model spec), per-stage models summary, environment (python, platform, machine, package versions), output summary, errors. |
@@ -43,13 +46,41 @@ open samples/out/my-paper/preview.html       # macOS
 
 ```python
 PdfEngine(
-    save_artifacts=True,   # default — writes document.json + nodes.jsonl + image crops + run.json
-    link_images=True,      # default — primary .md uses relative image refs (renders in viewers)
-    embed_images=True,     # default — also writes <stem>.embedded.md with base64 images
-    with_page_images=True, # explicit; redundant when save_artifacts=True
-    images_scale=1.5,      # render scale for page / picture / table crops
+    # Phase 1
+    save_artifacts=True,         # default — full artifact bundle (also chunks/tables/figures jsonl + run.json)
+    link_images=True,            # default — primary .md uses relative refs
+    embed_images=True,           # default — also writes <stem>.embedded.md
+    images_scale=1.5,
+    # Phase 2 (chunking)
+    chunk_tokenizer="sentence-transformers/all-MiniLM-L6-v2",
+    chunk_max_tokens=512,
+    # Phase 3 (opt-in heavy models)
+    granite_vision_tables=False, # set True to swap TableFormer for Granite-Vision (2B)
+    picture_description=None,    # "smolvlm" | "granite_vision" | "pixtral" | "qwen25_vl_3b"
+    picture_description_engine="vllm",
+    # Phase 3 (default-on noise filter)
+    filter_noise_pictures=True,  # tags + strips logos/watermarks/repeated banners from md
 )
 ```
+
+## Run the full-page VLM comparison
+
+```python
+from pathlib import Path
+from docling.engines import run_comparison
+
+result = run_comparison(
+    Path("samples/test-pdf-ai-manuscript.pdf"),
+    Path("samples/out"),
+    vlm_preset="granite_docling",   # default — DocTags response → comparable bundles
+)
+# writes:
+#   samples/out/test-pdf-ai-manuscript/standard/       (regular PdfEngine output)
+#   samples/out/test-pdf-ai-manuscript/full_page_vlm/  (VlmPipeline output)
+#   samples/out/test-pdf-ai-manuscript/comparison.md   (side-by-side summary)
+```
+
+Tell Claude later: *"run the full-page VLM comparison on samples/foo.pdf"* and it'll invoke `run_comparison()` for you.
 
 ## URL inputs (no local file needed)
 
