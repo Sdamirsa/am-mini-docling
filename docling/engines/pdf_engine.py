@@ -75,12 +75,12 @@ class PdfEngine:
         save_artifacts: bool = True,
         chunk_tokenizer: str = DEFAULT_TOKENIZER,
         chunk_max_tokens: int = DEFAULT_MAX_TOKENS,
-        granite_vision_tables: bool = False,
+        granite_vision_tables: bool = True,
         filter_noise_pictures: bool = True,
         noise_picture_classes: frozenset[str] = DEFAULT_NOISE_CLASSES,
         noise_repeat_threshold: int = DEFAULT_REPEAT_THRESHOLD,
-        picture_description: PictureDescriptionPreset | None = None,
-        picture_description_engine: PictureDescriptionEngine = "vllm",
+        picture_description: PictureDescriptionPreset | None = "granite_vision_4b",
+        picture_description_engine: PictureDescriptionEngine = "default",
     ) -> None:
         """Initialise the engine.
 
@@ -119,9 +119,11 @@ class PdfEngine:
             ``model_max_length``). Bump alongside ``chunk_tokenizer`` when
             switching to a larger-context embedding/chat model.
         granite_vision_tables
-            When True, swap the default TableFormer to the Granite-Vision
-            VLM-based table-structure model. Opt-in (downloads a 2B model on
-            first use). Default False.
+            When True (default), swap the default TableFormer to the
+            Granite-Vision VLM-based table-structure model
+            (``ibm-granite/granite-vision-3.2-2b``). Higher-quality on
+            messy tables; first use downloads ~4 GB and adds a few seconds
+            per table. Set False to fall back to TableFormer.
         filter_noise_pictures
             When True (default), runs the picture-noise filter
             (:func:`classify_pictures`) over each conversion. Pictures
@@ -137,14 +139,18 @@ class PdfEngine:
             A picture whose rounded bbox repeats on at least this many pages
             is flagged as noise even without a classifier hit (default 3).
         picture_description
-            Opt-in VLM picture description preset. Values:
-            ``"smolvlm"``, ``"granite_vision"``, ``"pixtral"``,
-            ``"qwen25_vl_3b"``. When set, captions land in
-            ``figures.jsonl[*].vlm_caption``. Default ``None`` (off).
+            VLM picture-description preset. Default ``"granite_vision_4b"``
+            (``ibm-granite/granite-vision-4.1-4b``). Other values:
+            ``"granite_vision"`` (3.3-2b — smaller/faster), ``"smolvlm"``,
+            ``"pixtral"``, ``"qwen25_vl_3b"``, or ``None`` to skip captions
+            entirely. Captions land in ``figures.jsonl[*].vlm_caption``.
+            First use downloads the model (4.1-4b ≈ 8 GB).
         picture_description_engine
             Inference runtime for the picture-description VLM. Values:
-            ``"vllm"`` (default), ``"transformers"``, ``"default"`` (let
-            Docling pick). Ignored when ``picture_description`` is None.
+            ``"default"`` (let Docling pick — falls back to transformers
+            when vLLM isn't installed; this is the default), ``"vllm"``
+            (force vLLM — requires it installed), ``"transformers"`` (force
+            transformers). Ignored when ``picture_description`` is None.
         """
         self._image_scale = images_scale
         self._embed_images = embed_images

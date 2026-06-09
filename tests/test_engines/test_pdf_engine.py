@@ -59,7 +59,12 @@ def test_pdf_engine_converts_local_fixture(tmp_path: Path) -> None:
     Verifies the wrapper's contract: status, source classification, page
     summaries, and markdown export are populated and internally consistent.
     """
-    engine = PdfEngine(save_artifacts=False, embed_images=False)
+    engine = PdfEngine(
+        save_artifacts=False,
+        embed_images=False,
+        picture_description=None,
+        granite_vision_tables=False,
+    )
     output: PdfConversionOutput = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -96,7 +101,15 @@ def test_pdf_engine_converts_local_fixture(tmp_path: Path) -> None:
 )
 def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
     """End-to-end: page images are retained and an HTML preview is written."""
-    engine = PdfEngine(with_page_images=True, images_scale=1.0, save_artifacts=False)
+    engine = PdfEngine(
+        with_page_images=True,
+        images_scale=1.0,
+        save_artifacts=False,
+        embed_images=False,
+        picture_description=None,
+        granite_vision_tables=False,
+        filter_noise_pictures=False,
+    )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path, make_html_preview=True)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -125,7 +138,13 @@ def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
 )
 def test_pdf_engine_writes_embedded_markdown_companion(tmp_path: Path) -> None:
     """``embed_images=True`` writes a second ``<stem>.embedded.md`` companion."""
-    engine = PdfEngine(embed_images=True, images_scale=1.0, save_artifacts=True)
+    engine = PdfEngine(
+        embed_images=True,
+        images_scale=1.0,
+        save_artifacts=True,
+        picture_description=None,
+        granite_vision_tables=False,
+    )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -152,7 +171,12 @@ def test_pdf_engine_writes_embedded_markdown_companion(tmp_path: Path) -> None:
 def test_pdf_engine_links_images_in_primary_markdown(tmp_path: Path) -> None:
     """``link_images=True`` (default) rewrites placeholders to ``![](images/..)``."""
     engine = PdfEngine(
-        embed_images=False, link_images=True, images_scale=1.0, save_artifacts=True
+        embed_images=False,
+        link_images=True,
+        images_scale=1.0,
+        save_artifacts=True,
+        picture_description=None,
+        granite_vision_tables=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -175,7 +199,12 @@ def test_pdf_engine_links_images_in_primary_markdown(tmp_path: Path) -> None:
 )
 def test_pdf_engine_writes_artifacts(tmp_path: Path) -> None:
     """``save_artifacts=True`` writes document.json, nodes.jsonl, and images."""
-    engine = PdfEngine(images_scale=1.0, save_artifacts=True)
+    engine = PdfEngine(
+        images_scale=1.0,
+        save_artifacts=True,
+        picture_description=None,
+        granite_vision_tables=False,
+    )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -228,7 +257,12 @@ def test_pdf_engine_writes_artifacts(tmp_path: Path) -> None:
 def test_pdf_engine_writes_chunks(tmp_path: Path) -> None:
     """``save_artifacts=True`` also produces ``chunks.jsonl`` via HybridChunker."""
     engine = PdfEngine(
-        images_scale=1.0, save_artifacts=True, embed_images=False, chunk_max_tokens=512
+        images_scale=1.0,
+        save_artifacts=True,
+        embed_images=False,
+        chunk_max_tokens=512,
+        picture_description=None,
+        granite_vision_tables=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -295,7 +329,13 @@ def test_pdf_engine_granite_vision_tables_config() -> None:
 )
 def test_pdf_engine_writes_structured_outputs(tmp_path: Path) -> None:
     """``tables.jsonl`` / ``figures.jsonl`` written only when items exist; rows align with image crops."""
-    engine = PdfEngine(images_scale=1.0, save_artifacts=True, embed_images=False)
+    engine = PdfEngine(
+        images_scale=1.0,
+        save_artifacts=True,
+        embed_images=False,
+        picture_description=None,
+        granite_vision_tables=False,
+    )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
     assert output.succeeded, f"conversion failed: {output.errors}"
 

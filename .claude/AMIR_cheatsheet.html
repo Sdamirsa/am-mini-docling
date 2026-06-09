@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Amir Engine — cheatsheet</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0; padding: 24px 32px; background: #f7f7f9; color: #1d1d1f;
+    line-height: 1.45;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: #666; font-size: 13px; margin-bottom: 24px; }
+  section { background: #fff; border: 1px solid #e1e1e6; border-radius: 6px;
+            padding: 16px 20px; margin-bottom: 20px; }
+  section h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px;
+                padding-bottom: 6px; border-bottom: 1px solid #eee; color: #333; }
+  section h3 { font-size: 13px; font-weight: 600; color: #555;
+                margin: 14px 0 4px; }
+  pre { background: #f3f3f5; border: 1px solid #e1e1e6; border-radius: 4px;
+        padding: 10px 12px; overflow-x: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px; margin: 4px 0 10px; line-height: 1.5; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+         background: #f0f0f3; padding: 1px 5px; border-radius: 3px; font-size: 12.5px; }
+  pre code { background: transparent; padding: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 6px 0 4px; }
+  table th, table td { border: 1px solid #e1e1e6; padding: 6px 10px; text-align: left;
+                       vertical-align: top; }
+  table th { background: #fafafa; font-weight: 600; }
+  .pill { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 600;
+          border-radius: 10px; background: #e3f2fd; color: #1565c0; margin-right: 6px;
+          vertical-align: middle; }
+  .pill-warn { background: #fff8e1; color: #8a6d00; }
+  .pill-ok { background: #e8f5e9; color: #2e7d32; }
+  .note { color: #666; font-size: 12px; margin: 4px 0 0; }
+  a { color: #1565c0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+  hr { border: 0; border-top: 1px solid #eee; margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<h1>Amir Engine cheatsheet</h1>
+<div class="lede">
+  One-page reference for the commands and Python entry points used most often in this fork.
+  Source of truth: <a href="REPO_CONTEXT.md">REPO_CONTEXT.md</a> · live status: <a href="AMIR_STAGE.md">AMIR_STAGE.md</a> · TODO: <a href="AMIR_TODO.md">AMIR_TODO.md</a>.
+</div>
+
+<section>
+  <h2>1 · Setup &amp; environment</h2>
+  <p class="note">aarch64 / Jetson / DGX Spark: <code>--all-extras</code> is broken (no <code>onnxruntime-gpu</code> wheel). Use the targeted set below.</p>
+<pre><code>uv sync --frozen --group dev --no-group docs --no-group examples --extra standard
+uv pip install -e .          # reinstall after editing pyproject scripts/entries</code></pre>
+</section>
+
+<section>
+  <h2>2 · Batch CLI: <code>amir-batch</code></h2>
+  <p>Runs <code>PdfEngine</code> over one or more PDFs (or every <code>*.pdf</code> in a directory) and prints a rich summary table.</p>
+
+  <h3>Most useful invocations</h3>
+<pre><code># Process every PDF under samples/ → samples/out/&lt;stem&gt;/...
+uv run amir-batch samples/
+
+# Custom output root
+uv run amir-batch samples/ -o samples/out
+
+# Specific PDFs
+uv run amir-batch samples/test-case-report1.pdf samples/test-pdf-ai-manuscript.pdf
+
+# Skip the HTML preview (faster, no preview.html)
+uv run amir-batch samples/ --no-preview
+
+# Full standard-vs-full-page-VLM A/B per PDF (heavy: pulls GraniteDocling)
+uv run amir-batch samples/ --compare
+
+# Add Qwen2.5-VL-3B picture captions (heavy: vLLM + model download)
+uv run amir-batch samples/ --picture-description qwen25_vl_3b
+
+# Swap TableFormer for Granite-Vision VLM tables (heavy: 2B model)
+uv run amir-batch samples/ --granite-vision-tables
+
+# All flags
+uv run amir-batch --help</code></pre>
+
+  <h3>Flag reference</h3>
+<table>
+<tr><th>Flag</th><th>Default</th><th>What it does</th></tr>
+<tr><td><code>-o / --output-dir</code></td><td><code>samples/out</code></td><td>Root output directory. One subfolder per PDF.</td></tr>
+<tr><td><code>-c / --compare</code></td><td>off</td><td>Run <code>run_comparison()</code>: standard pipeline + full-page VLM, plus a <code>comparison.md</code>.</td></tr>
+<tr><td><code>--vlm-preset</code></td><td><code>granite_docling</code></td><td>Full-page VLM preset for compare mode. DocTags-emitting presets keep the comparison apples-to-apples.</td></tr>
+<tr><td><code>--preview / --no-preview</code></td><td><code>--preview</code></td><td>Render <code>preview.html</code> (clickable bbox viewer).</td></tr>
+<tr><td><code>--images-scale</code></td><td><code>1.5</code></td><td>Render scale for page / picture / table crops.</td></tr>
+<tr><td><code>--granite-vision-tables</code></td><td>off</td><td>Swap TableFormer for Granite-Vision VLM table structure. Opt-in (downloads a 2B model).</td></tr>
+<tr><td><code>--picture-description</code></td><td><code>off</code></td><td>Per-figure VLM captions. Values: <code>off</code> · <code>smolvlm</code> · <code>granite_vision</code> · <code>pixtral</code> · <code>qwen25_vl_3b</code>.</td></tr>
+</table>
+</section>
+
+<section>
+  <h2>3 · Use as a Python library</h2>
+
+  <div class="grid2">
+    <div>
+      <h3>Single PDF</h3>
+<pre><code>from pathlib import Path
+from docling.engines import PdfEngine
+
+out = PdfEngine(images_scale=1.5).convert(
+    Path("samples/my-paper.pdf"),
+    output_dir=Path("samples/out"),
+    make_html_preview=True,
+)
+print(out.status, out.output_dir)
+# samples/out/my-paper/{
+#   my-paper.md, my-paper.embedded.md,
+#   document.json, nodes.jsonl, chunks.jsonl,
+#   tables.jsonl, figures.jsonl, run.json,
+#   images/, preview.html
+# }</code></pre>
+    </div>
+
+    <div>
+      <h3>Full-page VLM A/B comparison</h3>
+<pre><code>from pathlib import Path
+from docling.engines import run_comparison
+
+res = run_comparison(
+    Path("samples/my-paper.pdf"),
+    Path("samples/out"),
+    vlm_preset="granite_docling",  # default
+)
+# samples/out/my-paper/{
+#   standard/, full_page_vlm/, comparison.md
+# }</code></pre>
+    </div>
+  </div>
+
+  <h3>Common <code>PdfEngine</code> overrides</h3>
+<pre><code>PdfEngine(
+    save_artifacts=True,          # default — writes everything
+    link_images=True,             # default — .md uses ![](images/...) refs
+    embed_images=True,            # default — also writes &lt;stem&gt;.embedded.md (base64)
+    filter_noise_pictures=True,   # default — strip logos/banners from .md, tag in figures.jsonl
+    chunk_tokenizer="sentence-transformers/all-MiniLM-L6-v2",
+    chunk_max_tokens=512,
+    granite_vision_tables=False,  # opt-in: VLM-based tables (~2B model)
+    picture_description=None,     # "smolvlm" | "granite_vision" | "pixtral" | "qwen25_vl_3b"
+    picture_description_engine="vllm",
+    images_scale=1.5,
+)</code></pre>
+</section>
+
+<section>
+  <h2>4 · Output bundle (per PDF)</h2>
+<table>
+<tr><th>File</th><th>What</th></tr>
+<tr><td><code>&lt;stem&gt;.md</code></td><td>Primary markdown. Picture placeholders rewritten to <code>![](images/picture_NNN.png)</code>; noise pictures replaced by <code>&lt;!-- noise picture: ... --&gt;</code>.</td></tr>
+<tr><td><code>&lt;stem&gt;.embedded.md</code></td><td>Standalone — base64-inlined images (same noise filtering). ~10–15× larger.</td></tr>
+<tr><td><code>document.json</code></td><td>Full <code>DoclingDocument</code> serialisation (round-trippable).</td></tr>
+<tr><td><code>nodes.jsonl</code></td><td>One JSON per <code>iterate_items()</code> node: label, prov/bbox, text, captions, table data.</td></tr>
+<tr><td><code>chunks.jsonl</code></td><td>HybridChunker output: <code>{index, text, token_count, headings, page_nos, self_refs}</code>. RAG-ready.</td></tr>
+<tr><td><code>tables.jsonl</code></td><td>One row per table: caption_text, markdown, html, dims, flat cells (with offsets and spans), image_path.</td></tr>
+<tr><td><code>figures.jsonl</code></td><td>One row per figure: caption_text, image_path, <b>vlm_caption</b>, <b>classifier_label</b>, <b>is_noise</b> + <b>noise_reason</b>, annotations.</td></tr>
+<tr><td><code>run.json</code></td><td>Reproducibility: schema_version, source, status, timing, engine_config, full pipeline_options, models summary, python/platform/package versions.</td></tr>
+<tr><td><code>images/page_NNNN.png</code></td><td>Page renders.</td></tr>
+<tr><td><code>images/picture_NNN.png</code></td><td>Figure crops (via <code>PictureItem.get_image()</code>).</td></tr>
+<tr><td><code>images/table_NNN.png</code></td><td>Table crops (via <code>TableItem.get_image()</code>).</td></tr>
+<tr><td><code>preview.html</code></td><td>Clickable bbox viewer. Summary chips at top; per-kind side panel on click (picture: caption + VLM desc + classifier + thumbnail; table: dims + rendered HTML; text: body). Noise pictures shown dashed-gray with badge.</td></tr>
+</table>
+  <p class="note">In <code>--compare</code> mode each PDF gets an extra <code>standard/</code> and <code>full_page_vlm/</code> subfolder plus <code>comparison.md</code>.</p>
+</section>
+
+<section>
+  <h2>5 · Tests &amp; gates</h2>
+<pre><code>make validate                              # full pre-push gate (ruff, ty, tach, etc.)
+make check                                 # read-only checks
+make test                                  # full pytest suite
+uv run pytest tests/test_engines/ -q       # just the engine tests (fast)
+uv run pytest tests/test_engines/test_pdf_engine.py::test_pdf_engine_writes_artifacts -x</code></pre>
+</section>
+
+<section>
+  <h2>6 · Inspecting outputs (jq one-liners)</h2>
+<pre><code># How many chunks and what's the longest one?
+jq -s 'length, (map(.token_count) | max)' samples/out/my-paper/chunks.jsonl
+
+# Section hierarchy of all chunks
+jq -r '.headings | join(" / ")' samples/out/my-paper/chunks.jsonl | sort -u
+
+# Tables: dims + caption
+jq -r '[.index, .num_rows, .num_cols, .caption_text] | @tsv' samples/out/my-paper/tables.jsonl
+
+# Figures: which ones are noise + why
+jq -r 'select(.is_noise) | [.index, .classifier_label, .noise_reason] | @tsv' samples/out/my-paper/figures.jsonl
+
+# run.json highlights
+jq '.timing.duration_seconds, .models.layout.model_spec.name, .output_summary' samples/out/my-paper/run.json</code></pre>
+</section>
+
+<section>
+  <h2>7 · Git / push hygiene (project-specific)</h2>
+<pre><code>git status                  # check before push
+make validate               # auto-formats + lints + ty + tach (run until clean)
+git add &lt;files&gt; &amp;&amp; git commit -m "..."   # user pushes themselves; never push to main without ask</code></pre>
+  <p class="note"><span class="pill pill-warn">heads-up</span> Sensitive notes (hostnames, machine paths) belong in <code>.claude/private-hand-off/</code> (gitignored), not in repo docs.</p>
+</section>
+
+<section>
+  <h2>8 · Tell Claude later</h2>
+  <p>Phrases the agent already knows how to act on:</p>
+  <ul>
+    <li>"<i>run amir-batch on samples/</i>" → executes <code>uv run amir-batch samples/</code></li>
+    <li>"<i>run the full-page VLM comparison on samples/foo.pdf</i>" → calls <code>run_comparison(...)</code></li>
+    <li>"<i>refresh the preview for samples/test-pdf-ai-manuscript.pdf</i>" → re-renders <code>preview.html</code></li>
+    <li>"<i>swap to Qwen3-VL</i>" → changes <code>repo_id</code> in <a href="../docling/engines/vlm_specs.py">vlm_specs.py</a></li>
+  </ul>
+</section>
+
+</body>
+</html>

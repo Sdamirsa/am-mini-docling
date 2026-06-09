@@ -19,6 +19,7 @@ from docling.datamodel.pipeline_options import (
 from docling.datamodel.pipeline_options_vlm_model import ResponseFormat
 from docling.datamodel.stage_model_specs import VlmModelSpec
 from docling.datamodel.vlm_engine_options import (
+    AutoInlineVlmEngineOptions,
     BaseVlmEngineOptions,
     TransformersVlmEngineOptions,
     VllmVlmEngineOptions,
@@ -28,6 +29,7 @@ from docling.datamodel.vlm_engine_options import (
 PictureDescriptionPreset = Literal[
     "smolvlm",
     "granite_vision",
+    "granite_vision_4b",
     "pixtral",
     "qwen25_vl_3b",
 ]
@@ -40,6 +42,17 @@ QWEN25_VL_3B_PICTURE_DESC_SPEC = VlmModelSpec(
     default_repo_id="Qwen/Qwen2.5-VL-3B-Instruct",
     prompt="Describe this image in one or two concise sentences. Be specific and factual.",
     response_format=ResponseFormat.MARKDOWN,
+    max_new_tokens=200,
+)
+
+# Granite-Vision 4.1 4B — newest IBM document-vision model. Docling ships a
+# bundled spec for it (`GRANITE_VISION_4_1_TRANSFORMERS`) but only registers
+# the 3.3-2B variant as a picture-description preset, so we declare our own.
+GRANITE_VISION_4B_PICTURE_DESC_SPEC = VlmModelSpec(
+    name="Granite-Vision-4.1-4B",
+    default_repo_id="ibm-granite/granite-vision-4.1-4b",
+    prompt="What is shown in this image? Describe it in 1-2 concise factual sentences.",
+    response_format=ResponseFormat.PLAINTEXT,
     max_new_tokens=200,
 )
 
@@ -60,21 +73,31 @@ def build_picture_description_options(
     engine_opts = _engine_options(engine)
 
     if preset == "qwen25_vl_3b":
-        kwargs: dict = {"model_spec": QWEN25_VL_3B_PICTURE_DESC_SPEC}
-        if engine_opts is not None:
-            kwargs["engine_options"] = engine_opts
-        return PictureDescriptionVlmEngineOptions(**kwargs)
-
-    if engine_opts is not None:
-        return PictureDescriptionVlmEngineOptions.from_preset(
-            preset, engine_options=engine_opts
+        return PictureDescriptionVlmEngineOptions(
+            model_spec=QWEN25_VL_3B_PICTURE_DESC_SPEC,
+            engine_options=engine_opts,
         )
-    return PictureDescriptionVlmEngineOptions.from_preset(preset)
+
+    if preset == "granite_vision_4b":
+        return PictureDescriptionVlmEngineOptions(
+            model_spec=GRANITE_VISION_4B_PICTURE_DESC_SPEC,
+            engine_options=engine_opts,
+        )
+
+    return PictureDescriptionVlmEngineOptions.from_preset(
+        preset, engine_options=engine_opts
+    )
 
 
-def _engine_options(engine: PictureDescriptionEngine) -> BaseVlmEngineOptions | None:
+def _engine_options(engine: PictureDescriptionEngine) -> BaseVlmEngineOptions:
+    """Translate engine name → engine options.
+
+    ``"default"`` returns :class:`AutoInlineVlmEngineOptions` so Docling's
+    auto-selector picks the best available runtime (vLLM if installed, then
+    transformers). ``"vllm"`` and ``"transformers"`` force the choice.
+    """
     if engine == "vllm":
         return VllmVlmEngineOptions(engine_type=VlmEngineType.VLLM)
     if engine == "transformers":
         return TransformersVlmEngineOptions(engine_type=VlmEngineType.TRANSFORMERS)
-    return None
+    return AutoInlineVlmEngineOptions(engine_type=VlmEngineType.AUTO_INLINE)

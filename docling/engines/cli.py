@@ -96,21 +96,22 @@ def main(
         typer.Option(
             "--granite-vision-tables/--no-granite-vision-tables",
             help=(
-                "Use Granite-Vision VLM for table-structure recognition "
-                "(opt-in: downloads a 2B model on first use)."
+                "Use Granite-Vision VLM (3.2-2b) for table structure. "
+                "Default on; turn off for plain TableFormer."
             ),
         ),
-    ] = False,
+    ] = True,
     picture_description: Annotated[
         str,
         typer.Option(
             "--picture-description",
             help=(
-                "VLM preset for figure captions. One of: 'smolvlm', "
-                "'granite_vision', 'pixtral', 'qwen25_vl_3b', or 'off'."
+                "VLM preset for figure captions. Default 'granite_vision_4b' "
+                "(Granite-Vision 4.1-4b). Other values: 'granite_vision' "
+                "(3.3-2b), 'smolvlm', 'pixtral', 'qwen25_vl_3b', or 'off'."
             ),
         ),
-    ] = "off",
+    ] = "granite_vision_4b",
 ) -> None:
     """Run ``PdfEngine`` (or the comparison runner) on every PDF found."""
     console = Console()
