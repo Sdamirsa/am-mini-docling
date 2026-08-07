@@ -214,11 +214,14 @@ class GraniteVisionTableStructureModel(BaseTableStructureModel):
                 artifacts_path,
                 device_map=self.device,
                 dtype=torch.bfloat16,
+                # granite-vision-4.1-4b's connector is a Blip2-style Q-Former,
+                # which does not support sdpa attention (huggingface/transformers#28005)
+                # — flash_attention_2 when available, otherwise eager (never sdpa).
                 _attn_implementation=(
                     "flash_attention_2"
                     if self.device.startswith("cuda")
                     and self.accelerator_options.cuda_use_flash_attention2
-                    else "sdpa"
+                    else "eager"
                 ),
                 trust_remote_code=True,
             )

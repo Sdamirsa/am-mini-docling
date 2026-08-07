@@ -451,6 +451,15 @@ _HTML_TEMPLATE = """<!doctype html>
     font-size: 9px; font-weight: 600; border-radius: 2px;
     pointer-events: none;
   }}
+  .bbox.cited {{
+    outline: 3px solid #e33; outline-offset: 1px;
+    background-color: rgba(227, 51, 51, 0.25) !important; z-index: 4;
+  }}
+  .citation-link {{
+    display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; word-break: break-all; background: #f7f7f7;
+    padding: 4px 6px; border-radius: 2px; user-select: all;
+  }}
   #panel {{
     position: fixed; top: 0; right: 0; width: 460px; height: 100vh;
     background: #fff; border-left: 1px solid #ddd; box-shadow: -2px 0 6px rgba(0,0,0,0.05);
@@ -510,7 +519,7 @@ _HTML_TEMPLATE = """<!doctype html>
 <body>
 <header>
   <h1>Docling preview — {title}</h1>
-  <div class="hint">Click any bounding box to inspect node metadata. Dashed boxes are filtered as noise.</div>
+  <div class="hint">Click any bounding box to inspect node metadata. Dashed boxes are filtered as noise. Append <code>?ref=self_ref[,self_ref...]</code> to this page's URL (values from <code>chunks.jsonl</code> / <code>nodes.jsonl</code>, e.g. <code>#/texts/12</code>) to jump to and highlight cited evidence.</div>
   {summary}
   {legend}
 </header>
@@ -595,13 +604,34 @@ _HTML_TEMPLATE = """<!doctype html>
     panelSelfRef.textContent = payload.self_ref || '';
 
     let html = '';
-    if (payload.kind === 'picture') html = renderPicture(payload);
-    else if (payload.kind === 'table') html = renderTable(payload);
-    else html = renderText(payload);
+    if (payload.self_ref) {{
+      const link = window.location.pathname + '?ref=' + encodeURIComponent(payload.self_ref);
+      html += field('Citation link (copy for this node)',
+        '<code class="citation-link">' + escapeHtml(link) + '</code>', {{raw: true}});
+    }}
+    if (payload.kind === 'picture') html += renderPicture(payload);
+    else if (payload.kind === 'table') html += renderTable(payload);
+    else html += renderText(payload);
 
     html += '<details class="panel-raw"><summary>Show raw JSON</summary><pre>' +
       escapeHtml(JSON.stringify(payload.raw, null, 2)) + '</pre></details>';
     panelBody.innerHTML = html;
+  }}
+
+  function highlightRefs(refs) {{
+    let first = null;
+    refs.forEach(function(ref) {{
+      document.querySelectorAll('.bbox[data-self-ref="' + ref + '"]').forEach(function(box) {{
+        box.classList.add('cited');
+        if (!first) first = box;
+      }});
+    }});
+    if (first) {{
+      first.scrollIntoView({{block: 'center'}});
+      showNode(first);
+    }} else {{
+      console.warn('preview.html: no bbox matched ref(s)', refs);
+    }}
   }}
 
   document.querySelectorAll('.bbox').forEach(function(box) {{
@@ -615,6 +645,11 @@ _HTML_TEMPLATE = """<!doctype html>
   document.addEventListener('keydown', function(e) {{
     if (e.key === 'Escape') clearSelection();
   }});
+
+  const refParam = new URLSearchParams(window.location.search).get('ref');
+  if (refParam) {{
+    highlightRefs(refParam.split(',').map(function(r) {{ return r.trim(); }}).filter(Boolean));
+  }}
 }})();
 </script>
 </body>

@@ -16,8 +16,11 @@ from docling.datamodel.pipeline_options import (
     PictureDescriptionVlmEngineOptions,
     PictureDescriptionVlmOptions,
 )
-from docling.datamodel.pipeline_options_vlm_model import ResponseFormat
-from docling.datamodel.stage_model_specs import VlmModelSpec
+from docling.datamodel.pipeline_options_vlm_model import (
+    ResponseFormat,
+    TransformersModelType,
+)
+from docling.datamodel.stage_model_specs import EngineModelConfig, VlmModelSpec
 from docling.datamodel.vlm_engine_options import (
     AutoInlineVlmEngineOptions,
     BaseVlmEngineOptions,
@@ -48,12 +51,26 @@ QWEN25_VL_3B_PICTURE_DESC_SPEC = VlmModelSpec(
 # Granite-Vision 4.1 4B — newest IBM document-vision model. Docling ships a
 # bundled spec for it (`GRANITE_VISION_4_1_TRANSFORMERS`) but only registers
 # the 3.3-2B variant as a picture-description preset, so we declare our own.
+#
+# Its connector is a Blip2-style Q-Former, which transformers' sdpa attention
+# path doesn't support (huggingface/transformers#28005) — force eager via the
+# transformers engine's attn_implementation extra_config override. It also
+# needs AutoModelForImageTextToText (not the bare AutoModel default), since
+# only the *ForConditionalGeneration class exposes .generate().
 GRANITE_VISION_4B_PICTURE_DESC_SPEC = VlmModelSpec(
     name="Granite-Vision-4.1-4B",
     default_repo_id="ibm-granite/granite-vision-4.1-4b",
     prompt="What is shown in this image? Describe it in 1-2 concise factual sentences.",
     response_format=ResponseFormat.PLAINTEXT,
     max_new_tokens=200,
+    engine_overrides={
+        VlmEngineType.TRANSFORMERS: EngineModelConfig(
+            extra_config={
+                "attn_implementation": "eager",
+                "transformers_model_type": TransformersModelType.AUTOMODEL_IMAGETEXTTOTEXT,
+            }
+        ),
+    },
 )
 
 

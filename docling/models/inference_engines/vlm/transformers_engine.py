@@ -196,17 +196,28 @@ class TransformersVlmEngine(BaseVlmEngine, HuggingFaceModelDownloadMixin):
         if torch_dtype is None and self.model_config is not None:
             torch_dtype = self.model_config.extra_config.get("torch_dtype")
 
+        # Resolve attn_implementation: extra_config override (for models whose
+        # submodules don't support sdpa, e.g. a Blip2-style Q-Former connector)
+        # > the usual flash_attention_2/sdpa heuristic.
+        attn_implementation = None
+        if self.model_config is not None:
+            attn_implementation = self.model_config.extra_config.get(
+                "attn_implementation"
+            )
+        if attn_implementation is None:
+            attn_implementation = (
+                "flash_attention_2"
+                if self.device.startswith("cuda")  # type: ignore[union-attr]
+                and self.accelerator_options.cuda_use_flash_attention2
+                else "sdpa"
+            )
+
         # Load model
         self.vlm_model = model_cls.from_pretrained(
             artifacts_path,
             device_map=self.device,
             dtype=torch_dtype,
-            _attn_implementation=(
-                "flash_attention_2"
-                if self.device.startswith("cuda")  # type: ignore[union-attr]
-                and self.accelerator_options.cuda_use_flash_attention2
-                else "sdpa"
-            ),
+            _attn_implementation=attn_implementation,
             trust_remote_code=self.options.trust_remote_code,
             revision=revision,
             quantization_config=quantization_config,
