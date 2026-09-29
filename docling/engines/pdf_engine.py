@@ -128,8 +128,9 @@ class PdfEngine:
         granite_vision_tables
             When True (default), swap the default TableFormer to the
             Granite-Vision VLM-based table-structure model
-            (``ibm-granite/granite-vision-3.2-2b``). Higher-quality on
-            messy tables; first use downloads ~4 GB and adds a few seconds
+            (``ibm-granite/granite-vision-4.1-4b``). Higher-quality on
+            messy tables; shares weights with the default figure-description
+            preset (~13 GB download on first use) and adds a few seconds
             per table. Set False to fall back to TableFormer.
         filter_noise_pictures
             When True (default), runs the picture-noise filter

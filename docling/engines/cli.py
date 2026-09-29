@@ -99,7 +99,7 @@ def main(
         typer.Option(
             "--granite-vision-tables/--no-granite-vision-tables",
             help=(
-                "Use Granite-Vision VLM (3.2-2b) for table structure. "
+                "Use Granite-Vision VLM (4.1-4b) for table structure. "
                 "Default on; turn off for plain TableFormer."
             ),
         ),

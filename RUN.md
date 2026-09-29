@@ -72,7 +72,7 @@ uv run amir-batch <pdf-or-dir> [<pdf-or-dir> ...] [OPTIONS]
 | `--preview / --no-preview` | on | Renders the clickable HTML bbox viewer (`preview.html`). |
 | `--vlm-preset` | `granite_docling` | Full-page VLM preset, only used with `--compare`. |
 | `--images-scale` | `1.5` | Scale factor for rendered page/crop images (rendering only — does not affect layout or `self_ref` assignment). |
-| `--granite-vision-tables / --no-granite-vision-tables` | **on** | Table structure via Granite-Vision VLM (3.2-2b) vs. plain TableFormer. |
+| `--granite-vision-tables / --no-granite-vision-tables` | **on** | Table structure via Granite-Vision VLM (4.1-4b) vs. plain TableFormer. |
 | `--picture-description` | `granite_vision_4b` | VLM preset for figure captions. Other values: `granite_vision`, `smolvlm`, `pixtral`, `qwen25_vl_3b`, or `off`. |
 
 Defaults are VLM-heavy (`--granite-vision-tables` on, `--picture-description

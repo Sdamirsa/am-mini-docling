@@ -100,13 +100,13 @@ Default `PdfEngine(...)` is intentionally heavy-and-good:
 | `link_images` | `True` | Primary `.md` references image files |
 | `embed_images` | `True` | Additionally writes `.embedded.md` (base64) |
 | `filter_noise_pictures` | `True` | Auto-enables `do_picture_classification`; tags + strips logos / repeated banners |
-| `granite_vision_tables` | `True` | Swap TableFormer for **Granite-Vision 3.2-2B** (`GraniteVisionTableStructureOptions`) — better on messy tables |
+| `granite_vision_tables` | `True` | Swap TableFormer for **Granite-Vision 4.1-4B** (`GraniteVisionTableStructureOptions`) — better on messy tables |
 | `picture_description` | `"granite_vision_4b"` | VLM captions on every figure via **Granite-Vision 4.1-4B** |
 | `picture_description_engine` | `"default"` | `AUTO_INLINE` — uses vLLM if installed, else transformers (no crash on env mismatch) |
 | `chunk_tokenizer` | `sentence-transformers/all-MiniLM-L6-v2` | HybridChunker tokenizer |
 | `chunk_max_tokens` | `512` | Matches MiniLM `model_max_length` |
 
-**Heavy-mode implications**: first run downloads ~12 GB (Granite-Vision 4.1-4b ≈ 8 GB; Granite-Vision 3.2-2b ≈ 4 GB). After cache, conversion time per PDF goes from ~12 s (fast mode) to ~60–120 s (default). The maintainer accepted this trade-off — agents that prefer speed pass `picture_description=None, granite_vision_tables=False`.
+**Heavy-mode implications**: first run downloads Granite-Vision 4.1-4b (~13 GB on disk; one model serves both tables and figures). After cache, conversion time per PDF goes from ~12 s (fast mode) to ~60–120 s (default). The maintainer accepted this trade-off — agents that prefer speed pass `picture_description=None, granite_vision_tables=False`.
 
 **Why we built our own `granite_vision_4b` preset**: Docling only registers a `granite_vision` picture-description preset pointing at 3.3-2B. The newer 4.1-4B exists in `vlm_model_specs.py` but only as a full-page-VLM convert spec. Our preset lives in `docling/engines/vlm_specs.py` so switching to Qwen3-VL or a newer Granite is a one-line edit (change `default_repo_id`).
 
@@ -152,7 +152,7 @@ uv run pytest tests/test_engines/ -q       # just engine tests (fast — 13 pass
 
 - **Phase 1 — PDF → structured conversion** ✅ — `PdfEngine`, schemas, validation, artifacts, run snapshot, HTML preview.
 - **Phase 2 — Chunking + structured JSON outputs** ✅ — HybridChunker, tables.jsonl, figures.jsonl.
-- **Phase 3 — VLM integration** ✅ — Granite-Vision-4.1-4B picture description, Granite-Vision-3.2-2B tables, picture noise filter, full-page VLM comparison runner, extended HTML preview.
+- **Phase 3 — VLM integration** ✅ — Granite-Vision-4.1-4B picture description, Granite-Vision-4.1-4B tables, picture noise filter, full-page VLM comparison runner, extended HTML preview.
 - **Phase 4 — LLM context enrichment** ❌ **DROPPED** (2026-05-21). Decision: keep the engine focused on clean structured JSON; LLM summarization / topic / metadata extraction belongs in a downstream consumer reading the `chunks.jsonl` + `figures.jsonl` + `tables.jsonl` bundle.
 - **Phase 5 — FastAPI + batch CLI** — only the CLI is done (`amir-batch`). REST API not started; not currently planned.
 - **Phase 6 — Docker / deploy** — not started.

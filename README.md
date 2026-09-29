@@ -35,14 +35,14 @@ Paths work with either slash style (`out\my-paper` on Windows is fine); all outp
 | **Suggested (default)** — VLM figure descriptions + VLM tables | `amir-batch paper.pdf` | **≥ 32 GB GPU memory** (measured peak **25.5 GB**) | ~13 min |
 | Fast — no VLMs | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | not required (this run used the GPU for layout; CPU-only is slower, untimed) | ~1 min |
 
-Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory), HF `transformers` backend. First run downloads ~12 GB of model weights. 24 GB cards are untested.
+Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory), HF `transformers` backend. First run downloads the Granite-Vision 4.1-4B weights (~13 GB on disk here). 24 GB cards are untested.
 
 ## 🧠 The suggested config (what `amir-batch` does by default)
 
 | Stage | Model | Why |
 |---|---|---|
 | Layout + reading order | Docling **Heron** layout model | upstream default, fast |
-| Tables | **Granite-Vision 3.2-2B** (VLM) | better than TableFormer on messy clinical tables |
+| Tables | **Granite-Vision 4.1-4B** (VLM, same weights as figures) | better than TableFormer on messy clinical tables |
 | Figure descriptions | **Granite-Vision 4.1-4B** (VLM) | one paragraph per figure → `figures.jsonl[*].vlm_caption` |
 | Figure classification | Docling picture classifier | tags + strips logos / repeated banners ("noise") |
 | Chunking | Docling `HybridChunker`, MiniLM tokenizer, 512 tokens | ready for embeddings / RAG |
