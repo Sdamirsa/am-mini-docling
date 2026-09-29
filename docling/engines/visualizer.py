@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """HTML bounding-box viewer for :class:`PdfEngine` results.
 
 Produces a single ``preview.html`` (plus one PNG per page) showing each page

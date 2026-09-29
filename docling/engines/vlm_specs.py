@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """VLM presets for the Amir Engine.
 
 Docling ships picture-description presets for ``smolvlm``, ``granite_vision``
@@ -68,7 +71,7 @@ GRANITE_VISION_4B_PICTURE_DESC_SPEC = VlmModelSpec(
             torch_dtype="bfloat16",
             extra_config={
                 "transformers_model_type": TransformersModelType.AUTOMODEL_IMAGETEXTTOTEXT,
-            }
+            },
         ),
     },
 )

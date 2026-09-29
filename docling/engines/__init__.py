@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Amir Engine — high-level wrappers over Docling for PDF → structured pipelines.
 
 This subpackage is project-local (not upstream Docling). Phase 1 ships

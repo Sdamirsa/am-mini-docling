@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Mark non-content pictures (logos, watermarks, repeated banners) as noise.
 
 Two complementary signals:

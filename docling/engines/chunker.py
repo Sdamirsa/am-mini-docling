@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Chunked text view of a converted PDF, written as ``chunks.jsonl``.
 
 Wraps :class:`docling_core.transforms.chunker.HybridChunker` so an agent or

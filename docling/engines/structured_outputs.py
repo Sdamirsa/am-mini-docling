@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Per-PDF ``tables.jsonl`` and ``figures.jsonl`` — agent-friendly views.
 
 These derive value-add fields from the ``DoclingDocument`` that ``nodes.jsonl``

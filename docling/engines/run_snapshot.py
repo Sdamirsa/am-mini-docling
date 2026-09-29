@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Per-PDF ``run.json`` snapshot: environment, timing, models, and config.
 
 Written alongside ``document.json`` / ``nodes.jsonl`` so any downstream agent

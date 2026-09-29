@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Output schemas for the Amir Engine wrappers."""
 
 from __future__ import annotations

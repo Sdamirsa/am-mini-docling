@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """High-level PDF conversion engine (Phase 1 of the Amir Engine build)."""
 
 from __future__ import annotations

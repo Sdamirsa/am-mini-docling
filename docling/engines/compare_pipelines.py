@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Side-by-side comparison: standard PdfEngine vs full-page VlmPipeline.
 
 Runs the same PDF through two pipelines:

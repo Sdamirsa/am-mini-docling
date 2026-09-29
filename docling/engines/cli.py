@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """``amir-batch`` CLI — run :class:`PdfEngine` over one or more PDFs.
 
 Usage:

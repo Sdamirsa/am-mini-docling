@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Tests for :class:`docling.engines.PdfEngine` (Phase 1)."""
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ from docling.engines.validation import (
     validate_pdf_source,
 )
 
-FIXTURE_PDF = Path("tests/data/pdf/2305.03393v1-pg9.pdf")
+FIXTURE_PDF = Path("tests/data/pdf/sources/2305.03393v1-pg9.pdf")
 
 
 def test_classify_source_url() -> None:

@@ -13,7 +13,7 @@ Live tracker for the build defined in [AMIR_TODO.md](AMIR_TODO.md). Keep entries
 | `docling/engines/pdf_engine.py` wrapper | ✅ done | Thin facade over `DocumentConverter`. |
 | Output schemas | ✅ done | Landed at `docling/engines/schemas.py` (not `docling/models/engine_output.py` — `docling/models/` is reserved for upstream ML model wrappers). |
 | Input validation | ✅ done | Landed at `docling/engines/validation.py` (not `docling/utils/`) so all Amir code lives in one subtree. |
-| `tests/test_engines/test_pdf_engine.py` | ✅ done | Real fixture: `tests/data/pdf/2305.03393v1-pg9.pdf`. 4 e2e tests + 5 unit tests. |
+| `tests/test_engines/test_pdf_engine.py` | ✅ done | Real fixture: `tests/data/pdf/sources/2305.03393v1-pg9.pdf`. 4 e2e tests + 5 unit tests. |
 | Local paths + URLs | ✅ done | `classify_source()` + `validate_pdf_source()`. |
 | Error handling + logging | ✅ done | Catches `ConversionError`; `_log = logging.getLogger(__name__)`. |
 | HTML bbox visualiser (clickable) | ✅ done | `docling/engines/visualizer.py` — overlays are one-per-`DocItem` from `iterate_items()`, **click any bbox** to open a side panel with the node's full metadata; Esc to clear. |

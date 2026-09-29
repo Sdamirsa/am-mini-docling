@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Persist DoclingDocument nodes + extracted images to per-PDF artifact folders.
 
 The artifact writer turns a single :class:`ConversionResult` into a directory
