@@ -33,7 +33,8 @@ Paths work with either slash style (`out\my-paper` on Windows is fine); all outp
 | Mode | Command | GPU | Speed (68-page paper) |
 |---|---|---|---|
 | **Suggested (default)** — VLM figure descriptions + VLM tables | `amir-batch paper.pdf` | **≥ 32 GB GPU memory** (measured peak **25.5 GB**) | ~13 min |
-| Fast — no VLMs | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | not required (this run used the GPU for layout; CPU-only is slower, untimed) | ~1 min |
+| Middle — VLM figure descriptions, TableFormer tables | `amir-batch paper.pdf --no-granite-vision-tables` | yes, one 4B VLM (peak not measured separately) | ~3.4 min |
+| Fast — no VLMs | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | not required (this run used the GPU for layout; CPU-only is slower, untimed) | ~1.4 min |
 
 Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory), HF `transformers` backend. First run downloads the Granite-Vision 4.1-4B weights (~13 GB on disk here). 24 GB cards are untested.
 
@@ -68,18 +69,20 @@ out/<pdf-name>/
 
 **Citable:** every chunk/table/figure carries a `self_ref` (e.g. `#/texts/12`). Open `preview.html?ref=%23%2Ftexts%2F12` to jump to the highlighted box on the page. See [docs/hand-off-notes/hand-off-note-for-citation.md](docs/hand-off-notes/hand-off-note-for-citation.md).
 
-## 🔬 Worked example (real output, committed)
+## 🔬 Worked example: one paper, three configs (real output, committed)
 
 Input: [`showcase/Public-test-manuscript.pdf`](showcase/Public-test-manuscript.pdf): *Vision-Language and Large Language Model Performance in Gastroenterology* (arXiv preprint, 68 pages), shared by its first author.
 
-Output: [`showcase/Public-test-manuscript/`](showcase/Public-test-manuscript/), produced by the default config above:
-**68 pages · 15 figures (all VLM-described) · 17 tables · 131 chunks · 0 errors · 13 min 17 s.**
+| Config | Output | Time |
+|---|---|---|
+| Fast (no VLM) | [`showcase/fast/`](showcase/fast/Public-test-manuscript/) | 1.4 min |
+| Middle (VLM on figures only) | [`showcase/figures-vlm/`](showcase/figures-vlm/Public-test-manuscript/) | 3.4 min |
+| Suggested default | [`showcase/default/`](showcase/default/Public-test-manuscript/) | 13.2 min |
 
-- Standalone viewer: [`preview.embedded.html`](showcase/Public-test-manuscript/preview.embedded.html) (download, then open in a browser)
-- Markdown: [`Public-test-manuscript.md`](showcase/Public-test-manuscript/Public-test-manuscript.md)
-- Figures + VLM descriptions: [`figures.jsonl`](showcase/Public-test-manuscript/figures.jsonl)
+All three: **68 pages · 15 figures · 17 tables · ~130 chunks · 0 errors.**
+➡️ **[showcase/README.md](showcase/README.md)** compares them side by side (figure descriptions, table accuracy, versions) and helps you pick one.
 
-Known rough edges seen in this run: some supplementary figures/tables have no detected caption, and the picture classifier occasionally mislabels a chart (e.g. `calendar`). The VLM descriptions are still correct for those figures.
+Known rough edges: some supplementary figures/tables have no detected caption, the picture classifier occasionally mislabels a chart (e.g. `calendar`), and VLM descriptions can misstate numbers. Check the figure itself before citing a value.
 
 ## 🧩 What this fork adds on top of Docling
 
