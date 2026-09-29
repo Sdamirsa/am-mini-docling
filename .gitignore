@@ -8,6 +8,10 @@ ds_convert_models/
 ### Emacs ###
 # -*- mode: gitignore; -*-
 *~
+*.dclx
+*.dclg
+*.xml
+*.zip
 \#*\#
 /.emacs.desktop
 /.emacs.desktop.lock
@@ -15,6 +19,8 @@ ds_convert_models/
 auto-save-list
 tramp
 .\#*
+_plans*
+_references*
 
 # Org-mode
 .org-id-locations
@@ -350,8 +356,13 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
+# docs site build output (zensical, mkdocs)
 /site
+
+# generated docs sources — produced by scripts/render_notebooks.py and
+# scripts/render_cli_reference.py at build time
+/docs/_generated/
+/docs/reference/cli.md
 
 # Pyre type checker
 .pyre/
@@ -452,3 +463,6 @@ CLAUDE.local.md
 
 # Private handoff notes (machine-specific or sensitive context)
 .claude/private-hand-off/
+
+# Local agent worktrees
+.claude/worktrees/

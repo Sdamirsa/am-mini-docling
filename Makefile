@@ -1,4 +1,4 @@
-.PHONY: help setup hooks-install check check-all validate validate-all fix typecheck tach dprint-check dprint-fix test
+.PHONY: help setup hooks-install check check-all validate validate-all fix typecheck tach dprint-check dprint-fix test docs-render docs-build docs-serve docs-clean
 
 help: ## Show available targets.
 	@awk 'BEGIN {FS = ":.*##"; print "Available targets:"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -12,8 +12,8 @@ hooks-install: ## Install git hooks via prek.
 check: check-all ## Run read-only local checks.
 
 check-all: ## Run all read-only local checks.
-	uv run ruff format --check --config=pyproject.toml docling tests docs/examples
-	uv run ruff check --config=pyproject.toml docling tests docs/examples
+	uv run ruff format --check --config=pyproject.toml docling tests docs/examples perfs
+	uv run ruff check --config=pyproject.toml docling tests docs/examples perfs
 	uv run --no-sync ty check
 	uv run --no-sync tach check
 	python3 scripts/check_tach_module_coverage.py
@@ -39,8 +39,8 @@ validate-all: ## Run hooks on all files.
 	uv run prek run --all-files
 
 fix: ## Run Ruff and dprint auto-format/fixers.
-	uv run ruff format --config=pyproject.toml docling tests docs/examples
-	uv run ruff check --fix --config=pyproject.toml docling tests docs/examples
+	uv run ruff format --config=pyproject.toml docling tests docs/examples perfs
+	uv run ruff check --fix --config=pyproject.toml docling tests docs/examples perfs
 	uv run dprint fmt --config .github/dprint.json --config-discovery=false
 
 typecheck: ## Run ty.
@@ -56,4 +56,17 @@ dprint-fix: ## Run dprint formatter.
 	uv run --no-sync dprint fmt --config .github/dprint.json --config-discovery=false
 
 test: ## Run the default test suite.
-	uv run pytest -v
+	uv run pytest -v tests
+
+docs-render: ## Pre-render notebooks and CLI reference for the docs site.
+	uv run --no-sync python scripts/render_notebooks.py
+	uv run --no-sync python scripts/render_cli_reference.py
+
+docs-build: docs-render ## Build the static docs site with Zensical.
+	uv run --no-sync zensical build
+
+docs-serve: docs-render ## Serve the docs locally with Zensical (live reload).
+	uv run --no-sync zensical serve
+
+docs-clean: ## Remove generated docs artifacts.
+	rm -rf docs/_generated site docs/reference/cli.md

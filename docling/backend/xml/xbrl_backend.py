@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Docling Contributors
+# SPDX-License-Identifier: MIT
+
 """Backend to parse XBRL (eXtensible Business Reporting Language) documents.
 
 XBRL is a standard XML format used for business and financial reporting.
@@ -42,7 +45,7 @@ from docling.backend.html_backend import HTMLDocumentBackend
 from docling.datamodel.backend_options import HTMLBackendOptions, XBRLBackendOptions
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.document import InputDocument
-from docling.exceptions import OperationNotAllowed
+from docling.exceptions import DocumentLoadError, OperationNotAllowed
 
 _XBRL_AVAILABLE: bool = False
 _XBRL_IMPORT_ERROR: ImportError | None = None
@@ -92,7 +95,7 @@ class XBRLDocumentBackend(DeclarativeDocumentBackend):
         if not _XBRL_AVAILABLE:
             raise ImportError(
                 "The 'arelle-release' package is required to process XBRL documents. "
-                "Please install it using `pip install 'docling[xbrl]'`"
+                "Please install it using `pip install 'docling-slim[format-xml-xbrl]'`"
             ) from _XBRL_IMPORT_ERROR
 
         super().__init__(in_doc, path_or_stream)
@@ -178,7 +181,7 @@ class XBRLDocumentBackend(DeclarativeDocumentBackend):
             self.model_xbrl = model
             self.valid = True
         except Exception as exc:
-            raise RuntimeError(
+            raise DocumentLoadError(
                 "Could not initialize XBRL backend for file with hash"
                 f" {self.document_hash}."
             ) from exc
@@ -249,7 +252,7 @@ class XBRLDocumentBackend(DeclarativeDocumentBackend):
         """
         _log.debug("Starting XBRL instance conversion...")
         if not self.is_valid() or not self.model_xbrl:
-            raise RuntimeError("Invalid document with hash {self.document_hash}")
+            raise RuntimeError(f"Invalid document with hash {self.document_hash}")
 
         origin = DocumentOrigin(
             filename=self.file.name or "file",
