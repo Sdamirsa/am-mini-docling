@@ -1,0 +1,352 @@
+{
+  "schema_version": "1",
+  "source": {
+    "input": "showcase/Public-test-manuscript.pdf",
+    "source_kind": "local_path",
+    "file_name": "Public-test-manuscript.pdf",
+    "file_size_bytes": 4039703
+  },
+  "status": "ConversionStatus.SUCCESS",
+  "timing": {
+    "started_at": "2026-09-29T13:53:19.619852+00:00",
+    "finished_at": "2026-09-29T14:06:32.605987+00:00",
+    "duration_seconds": 792.986
+  },
+  "engine_config": {
+    "with_page_images": false,
+    "embed_images": true,
+    "link_images": true,
+    "images_scale": 1.5,
+    "save_artifacts": true,
+    "chunk_tokenizer": "sentence-transformers/all-MiniLM-L6-v2",
+    "chunk_max_tokens": 512,
+    "granite_vision_tables": true,
+    "filter_noise_pictures": true,
+    "noise_picture_classes": [
+      "barcode",
+      "logo",
+      "page_footer",
+      "page_header",
+      "qr_code",
+      "seal",
+      "signature",
+      "stamp",
+      "watermark"
+    ],
+    "noise_repeat_threshold": 3,
+    "picture_description": "granite_vision_4b",
+    "picture_description_engine": "default",
+    "converter_supplied": false
+  },
+  "pipeline_options": {
+    "document_timeout": null,
+    "accelerator_options": {
+      "num_threads": 4,
+      "device": "auto",
+      "cuda_use_flash_attention2": false
+    },
+    "enable_remote_services": false,
+    "allow_external_plugins": false,
+    "artifacts_path": null,
+    "do_picture_classification": true,
+    "picture_classification_options": {
+      "engine_options": {
+        "engine_type": "transformers",
+        "top_k": null,
+        "torch_dtype": null,
+        "compile_model": true
+      },
+      "model_spec": {
+        "name": "document_figure_classifier_v2",
+        "repo_id": "docling-project/DocumentFigureClassifier-v2.5",
+        "revision": "main",
+        "engine_overrides": {}
+      }
+    },
+    "do_picture_description": true,
+    "picture_description_options": {
+      "batch_size": 8,
+      "scale": 2.0,
+      "picture_area_threshold": 0.05,
+      "classification_allow": null,
+      "classification_deny": null,
+      "classification_min_confidence": 0.0,
+      "engine_options": {
+        "engine_type": "auto_inline",
+        "prefer_vllm": false
+      },
+      "model_spec": {
+        "name": "Granite-Vision-4.1-4B",
+        "default_repo_id": "ibm-granite/granite-vision-4.1-4b",
+        "revision": "main",
+        "prompt": "What is shown in this image? Describe it in 1-2 concise factual sentences.",
+        "response_format": "plaintext",
+        "supported_engines": null,
+        "engine_overrides": {
+          "transformers": {
+            "repo_id": null,
+            "revision": null,
+            "torch_dtype": null,
+            "extra_config": {
+              "attn_implementation": "eager",
+              "transformers_model_type": "automodel-imagetexttotext"
+            }
+          }
+        },
+        "api_overrides": {},
+        "trust_remote_code": false,
+        "stop_strings": [],
+        "max_new_tokens": 200
+      },
+      "prompt": "Describe this image in a few sentences.",
+      "generation_config": {
+        "max_new_tokens": 200,
+        "do_sample": false
+      }
+    },
+    "do_chart_extraction": false,
+    "chart_extraction_options": {
+      "kind": "chart_extraction",
+      "model": "granite-vision-v4",
+      "chart2csv": true,
+      "chart2code": false,
+      "chart2summary": false
+    },
+    "images_scale": 1.5,
+    "generate_page_images": true,
+    "generate_picture_images": true,
+    "do_table_structure": true,
+    "do_ocr": true,
+    "do_code_enrichment": false,
+    "do_formula_enrichment": false,
+    "force_backend_text": false,
+    "table_structure_options": {},
+    "ocr_options": {
+      "lang": [],
+      "force_full_page_ocr": false,
+      "bitmap_area_threshold": 0.05
+    },
+    "layout_options": {
+      "keep_empty_clusters": false,
+      "skip_cell_assignment": false,
+      "create_orphan_clusters": true,
+      "model_spec": {
+        "name": "docling_layout_heron",
+        "repo_id": "docling-project/docling-layout-heron",
+        "revision": "main",
+        "model_path": "",
+        "supported_devices": [
+          "cpu",
+          "cuda",
+          "mps",
+          "xpu"
+        ]
+      }
+    },
+    "code_formula_options": {
+      "engine_options": {
+        "engine_type": "auto_inline",
+        "prefer_vllm": false
+      },
+      "model_spec": {
+        "name": "CodeFormulaV2",
+        "default_repo_id": "docling-project/CodeFormulaV2",
+        "revision": "main",
+        "prompt": "",
+        "response_format": "plaintext",
+        "supported_engines": null,
+        "engine_overrides": {
+          "transformers": {
+            "repo_id": null,
+            "revision": null,
+            "torch_dtype": null,
+            "extra_config": {
+              "transformers_model_type": "automodel-imagetexttotext",
+              "extra_generation_config": {
+                "skip_special_tokens": false
+              },
+              "torch_dtype": "bfloat16"
+            }
+          }
+        },
+        "api_overrides": {},
+        "trust_remote_code": false,
+        "stop_strings": [
+          "</doctag>",
+          "<end_of_utterance>"
+        ],
+        "max_new_tokens": 4096
+      },
+      "scale": 2.0,
+      "max_size": null,
+      "extract_code": true,
+      "extract_formulas": true
+    },
+    "generate_table_images": false,
+    "generate_parsed_pages": false,
+    "ocr_batch_size": 4,
+    "layout_batch_size": 4,
+    "table_batch_size": 4,
+    "batch_polling_interval_seconds": 0.5,
+    "queue_max_size": 100
+  },
+  "models": {
+    "layout": {
+      "keep_empty_clusters": false,
+      "skip_cell_assignment": false,
+      "create_orphan_clusters": true,
+      "model_spec": {
+        "name": "docling_layout_heron",
+        "repo_id": "docling-project/docling-layout-heron",
+        "revision": "main",
+        "model_path": "",
+        "supported_devices": [
+          "cpu",
+          "cuda",
+          "mps",
+          "xpu"
+        ]
+      }
+    },
+    "ocr": {
+      "lang": [],
+      "force_full_page_ocr": false,
+      "bitmap_area_threshold": 0.05
+    },
+    "table_structure": {},
+    "picture_description": {
+      "batch_size": 8,
+      "scale": 2.0,
+      "picture_area_threshold": 0.05,
+      "classification_allow": null,
+      "classification_deny": null,
+      "classification_min_confidence": 0.0,
+      "engine_options": {
+        "engine_type": "auto_inline",
+        "prefer_vllm": false
+      },
+      "model_spec": {
+        "name": "Granite-Vision-4.1-4B",
+        "default_repo_id": "ibm-granite/granite-vision-4.1-4b",
+        "revision": "main",
+        "prompt": "What is shown in this image? Describe it in 1-2 concise factual sentences.",
+        "response_format": "plaintext",
+        "supported_engines": null,
+        "engine_overrides": {
+          "transformers": {
+            "repo_id": null,
+            "revision": null,
+            "torch_dtype": null,
+            "extra_config": {
+              "attn_implementation": "eager",
+              "transformers_model_type": "automodel-imagetexttotext"
+            }
+          }
+        },
+        "api_overrides": {},
+        "trust_remote_code": false,
+        "stop_strings": [],
+        "max_new_tokens": 200
+      },
+      "prompt": "Describe this image in a few sentences.",
+      "generation_config": {
+        "max_new_tokens": 200,
+        "do_sample": false
+      }
+    },
+    "picture_classification": {
+      "engine_options": {
+        "engine_type": "transformers",
+        "top_k": null,
+        "torch_dtype": null,
+        "compile_model": true
+      },
+      "model_spec": {
+        "name": "document_figure_classifier_v2",
+        "repo_id": "docling-project/DocumentFigureClassifier-v2.5",
+        "revision": "main",
+        "engine_overrides": {}
+      }
+    },
+    "code_formula": {
+      "engine_options": {
+        "engine_type": "auto_inline",
+        "prefer_vllm": false
+      },
+      "model_spec": {
+        "name": "CodeFormulaV2",
+        "default_repo_id": "docling-project/CodeFormulaV2",
+        "revision": "main",
+        "prompt": "",
+        "response_format": "plaintext",
+        "supported_engines": null,
+        "engine_overrides": {
+          "transformers": {
+            "repo_id": null,
+            "revision": null,
+            "torch_dtype": null,
+            "extra_config": {
+              "transformers_model_type": "automodel-imagetexttotext",
+              "extra_generation_config": {
+                "skip_special_tokens": false
+              },
+              "torch_dtype": "bfloat16"
+            }
+          }
+        },
+        "api_overrides": {},
+        "trust_remote_code": false,
+        "stop_strings": [
+          "</doctag>",
+          "<end_of_utterance>"
+        ],
+        "max_new_tokens": 4096
+      },
+      "scale": 2.0,
+      "max_size": null,
+      "extract_code": true,
+      "extract_formulas": true
+    },
+    "chart_extraction": {
+      "kind": "chart_extraction",
+      "model": "granite-vision-v4",
+      "chart2csv": true,
+      "chart2code": false,
+      "chart2summary": false
+    },
+    "accelerator": {
+      "num_threads": 4,
+      "device": "auto",
+      "cuda_use_flash_attention2": false
+    },
+    "do_ocr": true,
+    "do_table_structure": true,
+    "do_picture_classification": true,
+    "do_code_enrichment": false,
+    "do_formula_enrichment": false,
+    "do_chart_extraction": false
+  },
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Linux-6.17.0-1031-nvidia-aarch64-with-glibc2.39",
+    "machine": "aarch64",
+    "system": "Linux",
+    "packages": {
+      "docling": null,
+      "docling-core": "2.75.0",
+      "docling-ibm-models": "3.13.2",
+      "docling-parse": "5.11.0",
+      "onnxruntime": "1.23.2",
+      "onnxruntime-gpu": null,
+      "pypdfium2": "5.8.0",
+      "transformers": "5.8.1"
+    }
+  },
+  "output_summary": {
+    "page_count": 68,
+    "pictures_extracted": 15,
+    "tables_extracted": 17,
+    "error_count": 0
+  },
+  "errors": []
+}

@@ -42,7 +42,11 @@ from docling.engines.structured_outputs import (
     write_structured_outputs,
 )
 from docling.engines.validation import validate_pdf_source
-from docling.engines.visualizer import PreviewError, render_html_preview
+from docling.engines.visualizer import (
+    PreviewError,
+    embed_html_images,
+    render_html_preview,
+)
 from docling.engines.vlm_specs import (
     PictureDescriptionEngine,
     PictureDescriptionPreset,
@@ -373,6 +377,10 @@ class PdfEngine:
                         noise_flags=noise_flags,
                         chunks_jsonl=output.chunks_jsonl,
                     )
+                    if self._embed_images:
+                        output.preview_html_embedded = embed_html_images(
+                            output.preview_html
+                        )
                 except PreviewError as exc:
                     _log.warning("PdfEngine: HTML preview skipped: %s", exc)
                     output.errors.append(

@@ -11,6 +11,7 @@ tests/data/groundtruth/**
 tests/data/uspto/**
 tests/data_scanned/groundtruth/**
 tests/data/webp/groundtruth/**
+showcase/**
 
 [warn]
 .plans/active/docling-slim.md

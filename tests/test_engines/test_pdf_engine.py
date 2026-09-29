@@ -130,6 +130,30 @@ def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
     pngs = sorted((pdf_dir / "images").glob("page_*.png"))
     assert pngs, "no page images were written"
     assert all(p.stat().st_size > 0 for p in pngs)
+    assert output.preview_html_embedded is None
+
+
+@pytest.mark.skipif(
+    not FIXTURE_PDF.exists(),
+    reason=f"fixture {FIXTURE_PDF} not available",
+)
+def test_pdf_engine_writes_standalone_html_preview(tmp_path: Path) -> None:
+    """``embed_images=True`` adds a preview that works without ``images/``."""
+    engine = PdfEngine(
+        images_scale=1.0,
+        picture_description=None,
+        granite_vision_tables=False,
+        filter_noise_pictures=False,
+    )
+    output = engine.convert(FIXTURE_PDF, output_dir=tmp_path, make_html_preview=True)
+
+    assert output.succeeded, f"conversion failed: {output.errors}"
+    assert output.preview_html_embedded is not None
+    standalone = output.preview_html_embedded.read_text(encoding="utf-8")
+    assert "images/" not in standalone
+    assert "data:image/jpeg;base64," in standalone
+    # The linked preview is left untouched for folder-based sharing.
+    assert "images/page_" in output.preview_html.read_text(encoding="utf-8")
 
 
 @pytest.mark.skipif(

@@ -20,9 +20,12 @@ UI:
 
 from __future__ import annotations
 
+import base64
 import html
+import io
 import json
 import logging
+import re
 from pathlib import Path
 
 from docling_core.types.doc import PictureItem, TableItem
@@ -119,6 +122,46 @@ def render_html_preview(
     target = target_dir / "preview.html"
     target.write_text(html_doc, encoding="utf-8")
     _log.info("Wrote HTML preview to %s", target)
+    return target
+
+
+_IMAGE_REF = re.compile(r"images/[A-Za-z0-9_.-]+\.png")
+
+
+def embed_html_images(preview_html: Path, *, page_jpeg_quality: int = 80) -> Path:
+    """Write ``preview.embedded.html`` — *preview_html* with every
+    ``images/*.png`` reference inlined as a data URI, so the file works on
+    its own. Page renders are re-encoded as JPEG to keep the size shareable;
+    figure/table crops stay lossless PNG.
+    """
+    from PIL import Image
+
+    base_dir = preview_html.parent
+    cache: dict[str, str] = {}
+
+    def _data_uri(rel: str) -> str:
+        if rel not in cache:
+            path = base_dir / rel
+            if not path.exists():
+                cache[rel] = rel
+            elif Path(rel).name.startswith("page_"):
+                buf = io.BytesIO()
+                with Image.open(path) as img:
+                    img.convert("RGB").save(
+                        buf, format="JPEG", quality=page_jpeg_quality, optimize=True
+                    )
+                encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+                cache[rel] = f"data:image/jpeg;base64,{encoded}"
+            else:
+                encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+                cache[rel] = f"data:image/png;base64,{encoded}"
+        return cache[rel]
+
+    html_doc = preview_html.read_text(encoding="utf-8")
+    embedded = _IMAGE_REF.sub(lambda m: _data_uri(m.group(0)), html_doc)
+    target = base_dir / "preview.embedded.html"
+    target.write_text(embedded, encoding="utf-8")
+    _log.info("Wrote standalone HTML preview to %s", target)
     return target
 
 

@@ -82,6 +82,13 @@ def _source_block(source: str, source_kind: str) -> dict[str, Any]:
     block: dict[str, Any] = {"input": source, "source_kind": source_kind}
     if source_kind == "local_path":
         p = Path(source)
+        # Absolute paths leak usernames / machine layout into shared bundles.
+        resolved = p.resolve()
+        block["input"] = (
+            resolved.relative_to(Path.cwd()).as_posix()
+            if resolved.is_relative_to(Path.cwd())
+            else p.name
+        )
         block["file_name"] = p.name
         if p.exists():
             block["file_size_bytes"] = p.stat().st_size

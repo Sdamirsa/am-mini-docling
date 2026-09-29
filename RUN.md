@@ -111,9 +111,10 @@ figures.jsonl          # one row per picture: caption, image_path, vlm_caption, 
 run.json               # env, timing, full engine_config/pipeline_options
 images/                # page renders + picture/table crops
 preview.html           # bbox viewer — needs images/ alongside it, see below
+preview.embedded.html  # same viewer, images inlined — a single shareable file
 ```
 
-`preview.html` is **not standalone** — it references `images/page_NNNN.png`
+`preview.html` is **not standalone** (use `preview.embedded.html` for that) — it references `images/page_NNNN.png`
 etc. by relative path. Sharing just the `.html` file renders a blank page;
 share the whole `samples/out/<stem>/` folder (or zip it). See
 [docs/hand-off-notes/hand-off-note-for-citation.md](docs/hand-off-notes/hand-off-note-for-citation.md)

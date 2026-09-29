@@ -109,6 +109,13 @@ class PdfConversionOutput(BaseModel):
         None,
         description="Path to the HTML bounding-box viewer, when rendered.",
     )
+    preview_html_embedded: Path | None = Field(
+        None,
+        description=(
+            "Path to ``preview.embedded.html`` — the same viewer with all "
+            "images inlined as data URIs (written when ``embed_images=True``)."
+        ),
+    )
     # `raw` is not part of the serialisable schema — it carries the underlying
     # ConversionResult so callers can drop down to upstream APIs.
     raw: object | None = Field(default=None, exclude=True, repr=False)
