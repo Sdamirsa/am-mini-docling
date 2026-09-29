@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/00-session-start.py",
+            "command": "uv run --script \"${CLAUDE_PROJECT_DIR}/.claude/hooks/00-session-start.py\"",
             "timeout": 10
           }
         ]
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/05-verify-hooks-lock.py",
+            "command": "uv run --script \"${CLAUDE_PROJECT_DIR}/.claude/hooks/05-verify-hooks-lock.py\"",
             "timeout": 5
           }
         ]
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/10-pre-deny-secrets.py",
+            "command": "uv run --script \"${CLAUDE_PROJECT_DIR}/.claude/hooks/10-pre-deny-secrets.py\"",
             "timeout": 5
           }
         ]
@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/20-pre-deny-destructive.py",
+            "command": "uv run --script \"${CLAUDE_PROJECT_DIR}/.claude/hooks/20-pre-deny-destructive.py\"",
             "timeout": 5
           }
         ]
@@ -106,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/90-stop-log-invocation.py",
+            "command": "uv run --script \"${CLAUDE_PROJECT_DIR}/.claude/hooks/90-stop-log-invocation.py\"",
             "timeout": 5
           }
         ]
@@ -118,7 +118,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/15-warn-stale-model.py",
+            "command": "uv run --script \"${CLAUDE_PROJECT_DIR}/.claude/hooks/15-warn-stale-model.py\"",
             "timeout": 5
           }
         ]

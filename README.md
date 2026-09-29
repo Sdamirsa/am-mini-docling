@@ -6,12 +6,27 @@
 ## ⚡ TL;DR
 
 ```bash
-uv sync                                     # install
-uv run amir-batch my-paper.pdf -o out/      # convert → out/my-paper/
-open out/my-paper/preview.embedded.html     # look at it (one file, works offline)
+git clone https://github.com/Sdamirsa/am-mini-docling.git && cd am-mini-docling
+uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx   # install
+uv run amir-batch my-paper.pdf -o out                                   # convert → out/my-paper/
 ```
 
+Then open `out/my-paper/preview.embedded.html` in any browser (one file, works offline).
 That's it. Everything below is optional reading.
+
+### 💻 Platform notes (Linux · DGX Spark · Windows)
+
+Same install command everywhere (`uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx`); only the PyTorch step differs. Needs [uv](https://docs.astral.sh/uv/) and Python 3.10+.
+
+| Platform | Install | GPU |
+|---|---|---|
+| **Linux x86_64** + NVIDIA | install command only | CUDA torch comes from PyPI automatically |
+| **DGX Spark / Jetson (Linux aarch64)** | install command only. Do **not** use `--all-extras` / `make setup` (no `onnxruntime-gpu` wheel for aarch64) | CUDA torch from PyPI; this is the tested machine |
+| **Windows 10/11** + NVIDIA | install command, then<br>`uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu128`<br>and from then on run with **`uv run --no-sync amir-batch ...`** | PyPI torch on Windows is **CPU-only**. `--no-sync` stops uv from swapping the CUDA build back to the CPU one |
+| macOS (Apple Silicon) | install command only | runs on MPS/CPU; the default VLM config is slow, prefer fast mode |
+
+Check the GPU is visible: `uv run python -c "import torch; print(torch.cuda.is_available())"`.
+Paths work with either slash style (`out\my-paper` on Windows is fine); all outputs are UTF-8 and use `/` in their internal links, so a bundle made on Linux opens on Windows and vice versa.
 
 ## 🖥️ Hardware for the suggested config
 

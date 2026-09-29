@@ -180,7 +180,7 @@ def _summary_block(
     )
     chunks = 0
     if chunks_jsonl is not None and chunks_jsonl.exists():
-        with chunks_jsonl.open() as fh:
+        with chunks_jsonl.open(encoding="utf-8") as fh:
             chunks = sum(1 for _ in fh)
 
     chips = [

@@ -267,7 +267,7 @@ Two pipelines, same input. See `standard/` and `full_page_vlm/` for the full art
 def _count_lines(path: Path | None) -> int:
     if path is None or not path.exists():
         return 0
-    with path.open() as fh:
+    with path.open(encoding="utf-8") as fh:
         return sum(1 for _ in fh)
 
 

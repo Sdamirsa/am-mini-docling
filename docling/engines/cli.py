@@ -125,7 +125,7 @@ def main(
     mode = "compare" if compare else "single"
     console.rule(
         f"[bold]amir-batch[/bold] · mode=[cyan]{mode}[/cyan] · "
-        f"{len(pdf_paths)} PDF{'s' if len(pdf_paths) != 1 else ''} → "
+        f"{len(pdf_paths)} PDF{'s' if len(pdf_paths) != 1 else ''} -> "
         f"[green]{output_dir}[/green]"
     )
 
@@ -257,11 +257,11 @@ def _row_from_output(
     if out.figures_jsonl is not None and out.figures_jsonl.exists():
         import json
 
-        with out.figures_jsonl.open() as fh:
+        with out.figures_jsonl.open(encoding="utf-8") as fh:
             noise_count = sum(1 for line in fh if json.loads(line).get("is_noise"))
     chunks_count = 0
     if out.chunks_jsonl is not None and out.chunks_jsonl.exists():
-        with out.chunks_jsonl.open() as fh:
+        with out.chunks_jsonl.open(encoding="utf-8") as fh:
             chunks_count = sum(1 for _ in fh)
     figures_label = f"{len(out.picture_images)} ({noise_count} noise)"
     return {

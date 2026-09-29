@@ -129,7 +129,7 @@ The CLI is `docling/engines/cli.py` (typer + rich), wired via `pyproject.toml` `
 ```bash
 # aarch64 / Jetson / DGX Spark — `make setup` and `uv sync --all-extras` are BROKEN
 # (no onnxruntime-gpu wheel). Use this targeted install instead:
-uv sync --frozen --group dev --no-group docs --no-group examples --extra standard
+uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx   # the onnx extra keeps RapidOCR working
 
 # Reinstall the package whenever pyproject scripts/entries change:
 uv pip install -e .
@@ -183,7 +183,7 @@ uv run pytest tests/test_engines/ -q       # just engine tests (fast — 13 pass
 git submodule add -b dgx https://github.com/Sdamirsa/am-mini-docling.git vendor/am-mini-docling
 git submodule update --init --recursive
 cd vendor/am-mini-docling
-uv sync --frozen --group dev --no-group docs --no-group examples --extra standard
+uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx   # the onnx extra keeps RapidOCR working
 
 # Then use the package the same way as in this repo:
 python -c "from docling.engines import PdfEngine; print(PdfEngine)"
