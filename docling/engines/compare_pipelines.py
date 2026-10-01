@@ -115,7 +115,10 @@ def run_comparison(
     vlm_t0 = _dt.datetime.now(_dt.timezone.utc)
     vlm_converter = _build_vlm_converter(vlm_preset)
     vlm_engine = PdfEngine(
-        converter=vlm_converter, save_artifacts=True, embed_images=False
+        converter=vlm_converter,
+        save_artifacts=True,
+        embed_images=False,
+        figure_types=(standard_kwargs or {}).get("figure_types", True),
     )
     vlm_out = vlm_engine.convert(
         pdf_path,

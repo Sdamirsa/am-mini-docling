@@ -7,7 +7,9 @@ Two complementary signals:
 
 1. **Classifier label** — when the picture classifier
    (``DocumentPictureClassifier``) ran, any picture whose predicted class
-   is in :data:`DEFAULT_NOISE_CLASSES` (configurable) is flagged.
+   is in :data:`DEFAULT_NOISE_CLASSES` (configurable) is flagged. This
+   generic classifier is only trusted for noise; content figure types come
+   from :mod:`docling.engines.figure_typing`.
 2. **Repeated-bbox heuristic** — if the same picture geometry appears on
    ``repeat_threshold`` or more pages, it's almost certainly a journal
    header / logo / running banner. Works even when the classifier didn't
@@ -34,15 +36,19 @@ _log = logging.getLogger(__name__)
 
 # Common "noise" classes a document-figure classifier might emit. The exact
 # label set depends on the underlying model — keep this list configurable
-# rather than hard-coded.
+# rather than hard-coded. DocumentFigureClassifier-v2.5 emits ``bar_code``
+# (not ``barcode``) and ``icon`` for CC-BY / ORCID / "Check for updates"
+# badges.
 DEFAULT_NOISE_CLASSES: frozenset[str] = frozenset(
     {
         "logo",
+        "icon",
         "watermark",
         "signature",
         "stamp",
         "seal",
         "barcode",
+        "bar_code",
         "qr_code",
         "page_header",
         "page_footer",

@@ -51,7 +51,7 @@
 <section>
   <h2>1 · Setup &amp; environment</h2>
   <p class="note">aarch64 / Jetson / DGX Spark: <code>--all-extras</code> is broken (no <code>onnxruntime-gpu</code> wheel). Use the targeted set below.</p>
-<pre><code>uv sync --frozen --group dev --no-group docs --no-group examples --extra standard
+<pre><code>uv sync --frozen --group dev --no-group docs --no-group examples --extra standard --extra models-vlm-inline
 uv pip install -e .          # reinstall after editing pyproject scripts/entries</code></pre>
 </section>
 
@@ -161,7 +161,7 @@ res = run_comparison(
 <tr><td><code>nodes.jsonl</code></td><td>One JSON per <code>iterate_items()</code> node: label, prov/bbox, text, captions, table data.</td></tr>
 <tr><td><code>chunks.jsonl</code></td><td>HybridChunker output: <code>{index, text, token_count, headings, page_nos, self_refs}</code>. RAG-ready.</td></tr>
 <tr><td><code>tables.jsonl</code></td><td>One row per table: caption_text, markdown, html, dims, flat cells (with offsets and spans), image_path.</td></tr>
-<tr><td><code>figures.jsonl</code></td><td>One row per figure: caption_text, image_path, <b>vlm_caption</b>, <b>classifier_label</b>, <b>is_noise</b> + <b>noise_reason</b>, annotations.</td></tr>
+<tr><td><code>figures.jsonl</code></td><td>One row per figure: caption_text, image_path, <b>figure_type</b> (BiomedCLIP), <b>vlm_caption</b>, <b>generic_classifier_label</b> (noise filter only), <b>is_noise</b> + <b>noise_reason</b>, annotations.</td></tr>
 <tr><td><code>run.json</code></td><td>Reproducibility: schema_version, source, status, timing, engine_config, full pipeline_options, models summary, python/platform/package versions.</td></tr>
 <tr><td><code>images/page_NNNN.png</code></td><td>Page renders.</td></tr>
 <tr><td><code>images/picture_NNN.png</code></td><td>Figure crops (via <code>PictureItem.get_image()</code>).</td></tr>
@@ -192,7 +192,7 @@ jq -r '.headings | join(" / ")' samples/out/my-paper/chunks.jsonl | sort -u
 jq -r '[.index, .num_rows, .num_cols, .caption_text] | @tsv' samples/out/my-paper/tables.jsonl
 
 # Figures: which ones are noise + why
-jq -r 'select(.is_noise) | [.index, .classifier_label, .noise_reason] | @tsv' samples/out/my-paper/figures.jsonl
+jq -r 'select(.is_noise) | [.index, .generic_classifier_label, .noise_reason] | @tsv' samples/out/my-paper/figures.jsonl
 
 # run.json highlights
 jq '.timing.duration_seconds, .models.layout.model_spec.name, .output_summary' samples/out/my-paper/run.json</code></pre>

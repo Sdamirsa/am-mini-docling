@@ -94,7 +94,7 @@ class PdfConversionOutput(BaseModel):
     )
     figures_jsonl: Path | None = Field(
         None,
-        description="Path to ``figures.jsonl`` — one row per PictureItem (caption_text + vlm_caption + classifier_label + image_path).",
+        description="Path to ``figures.jsonl`` — one row per PictureItem (caption_text + figure_type + vlm_caption + generic_classifier_label + image_path).",
     )
     run_json: Path | None = Field(
         None,

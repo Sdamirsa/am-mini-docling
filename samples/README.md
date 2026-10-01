@@ -33,7 +33,7 @@ open samples/out/my-paper/preview.html       # macOS
 | `<pdf-stem>.embedded.md` | Standalone companion with images inlined as base64 (when `embed_images=True`, default). Same noise filtering applied. ~10–15× larger than primary. |
 | `chunks.jsonl` | `HybridChunker` output, one chunk per line: `{index, text, token_count, headings, page_nos, self_refs}`. RAG-ready. |
 | `tables.jsonl` | One row per table: caption, markdown rendering, HTML rendering, dimensions, flat cells with row/col offsets and spans, image_path. |
-| `figures.jsonl` | One row per figure: caption_text, image_path, **vlm_caption** (when picture description on), **classifier_label**, **is_noise** + **noise_reason**, raw annotations. |
+| `figures.jsonl` | One row per figure: caption_text, image_path, **figure_type** + **figure_type_confidence** (BiomedCLIP), **vlm_caption** (when picture description on), **generic_classifier_label** (noise filter only), **is_noise** + **noise_reason**, raw annotations. |
 | `document.json` | Full `DoclingDocument` serialisation (canonical, round-trippable). |
 | `nodes.jsonl` | One JSON object per node from `iterate_items()` — label, bbox/page (`prov`), text, captions, table cells, plus `_kind`, `_level`, and `image_path` for pictures/tables. |
 | `run.json` | Reproducibility snapshot: schema version, source, status, timing, engine config, full `pipeline_options` (incl. model spec), per-stage models summary, environment (python, platform, machine, package versions), output summary, errors. |

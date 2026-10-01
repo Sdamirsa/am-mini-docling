@@ -74,6 +74,7 @@ uv run amir-batch <pdf-or-dir> [<pdf-or-dir> ...] [OPTIONS]
 | `--images-scale` | `1.5` | Scale factor for rendered page/crop images (rendering only — does not affect layout or `self_ref` assignment). |
 | `--granite-vision-tables / --no-granite-vision-tables` | **on** | Table structure via Granite-Vision VLM (4.1-4b) vs. plain TableFormer. |
 | `--picture-description` | `granite_vision_4b` | VLM preset for figure captions. Other values: `granite_vision`, `smolvlm`, `pixtral`, `qwen25_vl_3b`, or `off`. |
+| `--figure-types / --no-figure-types` | **on** | Types every figure with BiomedCLIP (`ct`, `angiography`, `ecg`, `ultrasound`, `kaplan_meier`, `bar_chart`, ...) → `figures.jsonl[*].figure_type`. Runs in every config, VLM or not; ~0.8 GB GPU, ~15 ms per figure. Needs the `models-vlm-inline` extra (open-clip-torch). |
 
 Defaults are VLM-heavy (`--granite-vision-tables` on, `--picture-description
 granite_vision_4b`) — expect first-run model downloads and a noticeably
@@ -107,7 +108,7 @@ document.json          # full DoclingDocument (round-trippable)
 nodes.jsonl            # one row per DocItem (iterate_items() order)
 chunks.jsonl           # HybridChunker output: text, headings, page_nos, self_refs
 tables.jsonl           # one row per table: caption, markdown, html, cells
-figures.jsonl          # one row per picture: caption, image_path, vlm_caption, is_noise
+figures.jsonl          # one row per picture: caption, image_path, figure_type, vlm_caption, is_noise
 run.json               # env, timing, full engine_config/pipeline_options
 images/                # page renders + picture/table crops
 preview.html           # bbox viewer — needs images/ alongside it, see below

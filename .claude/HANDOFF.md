@@ -74,7 +74,7 @@ Produces `samples/out/<my>/`:
 | `nodes.jsonl` | One JSON per `iterate_items()` node — label, prov/bbox, text, captions, table data, `_kind`, `_level`, `image_path` | `save_artifacts=True` |
 | `chunks.jsonl` | HybridChunker output: `{index, text, token_count, headings, captions, page_nos, self_refs}` | `save_artifacts=True` |
 | `tables.jsonl` | Per-table: `caption_text`, `markdown`, `html`, dims, flat cells (with row/col offsets and spans), `image_path` | `save_artifacts=True` |
-| `figures.jsonl` | Per-figure: `caption_text`, `image_path`, `vlm_caption`, `classifier_label`, `is_noise`, `noise_reason`, raw annotations | `save_artifacts=True` |
+| `figures.jsonl` | Per-figure: `caption_text`, `image_path`, `figure_type` (+ `_confidence`, `_model`; BiomedCLIP), `vlm_caption`, `generic_classifier_label` (noise filter only), `is_noise`, `noise_reason`, raw annotations | `save_artifacts=True` |
 | `run.json` | schema_version, source, status, timing, full `engine_config`, full `pipeline_options` (incl. model spec), per-stage models summary, environment (python / platform / package versions) | `save_artifacts=True` |
 | `images/page_NNNN.png` | Page renders | when image gen on (auto if `save_artifacts`) |
 | `images/picture_NNN.png` | `PictureItem.get_image()` crops | same |
@@ -129,7 +129,7 @@ The CLI is `docling/engines/cli.py` (typer + rich), wired via `pyproject.toml` `
 ```bash
 # aarch64 / Jetson / DGX Spark — `make setup` and `uv sync --all-extras` are BROKEN
 # (no onnxruntime-gpu wheel). Use this targeted install instead:
-uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx   # the onnx extra keeps RapidOCR working
+uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx --extra models-vlm-inline   # onnx extra keeps RapidOCR working; models-vlm-inline brings open-clip-torch for figure types
 
 # Reinstall the package whenever pyproject scripts/entries change:
 uv pip install -e .
@@ -183,7 +183,7 @@ uv run pytest tests/test_engines/ -q       # just engine tests (fast — 13 pass
 git submodule add -b dgx https://github.com/Sdamirsa/am-mini-docling.git vendor/am-mini-docling
 git submodule update --init --recursive
 cd vendor/am-mini-docling
-uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx   # the onnx extra keeps RapidOCR working
+uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx --extra models-vlm-inline   # onnx extra keeps RapidOCR working; models-vlm-inline brings open-clip-torch for figure types
 
 # Then use the package the same way as in this repo:
 python -c "from docling.engines import PdfEngine; print(PdfEngine)"

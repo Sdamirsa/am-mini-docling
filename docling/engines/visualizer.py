@@ -12,8 +12,8 @@ UI:
 * Top header carries summary stats (pages, figures, tables, chunks).
 * Hover shows the node's label as a small tag.
 * Click any bbox to open the side panel — formatted for **the kind of
-  node**: pictures show caption + VLM description + classifier label +
-  image thumbnail; tables show caption + dimensions + the rendered HTML
+  node**: pictures show caption + figure type + VLM description + generic
+  classifier label + image thumbnail; tables show caption + dimensions + the rendered HTML
   table; text shows the heading path + body text. Raw JSON is available
   via a collapsible "Show raw" toggle.
 * Noise-flagged pictures (journal logos, repeated banners) render with a
@@ -35,6 +35,7 @@ from docling_core.types.doc import PictureItem, TableItem
 
 from docling.datamodel.base_models import ConversionStatus, Page
 from docling.datamodel.document import ConversionResult
+from docling.engines.figure_typing import get_figure_type
 from docling.engines.picture_filter import PictureNoiseFlag
 
 _log = logging.getLogger(__name__)
@@ -97,7 +98,8 @@ def render_html_preview(
     counters = {"picture": 0, "table": 0}
     indexed = _index_items_by_page(result, noise_by_self_ref, counters, target_dir)
 
-    summary = _summary_block(result, indexed, len(noise_by_self_ref), chunks_jsonl)
+    noise_count = sum(flag.is_noise for flag in noise_by_self_ref.values())
+    summary = _summary_block(result, indexed, noise_count, chunks_jsonl)
 
     page_blocks: list[str] = []
     for page in result.pages:
@@ -248,12 +250,17 @@ def _display_metadata(
         counters["picture"] += 1
         idx = counters["picture"]
         flag = noise_by_self_ref.get(self_ref)
+        figure_type = get_figure_type(item)
         info.update(
             {
                 "image_path": f"images/picture_{idx:03d}.png",
                 "caption_text": _caption_text(item, doc),
+                "figure_type": figure_type.label if figure_type else None,
+                "figure_type_confidence": (
+                    figure_type.confidence if figure_type else None
+                ),
                 "vlm_caption": _picture_vlm_caption(item),
-                "classifier_label": _picture_classifier_label(item),
+                "generic_classifier_label": _picture_classifier_label(item),
                 "is_noise": bool(getattr(flag, "is_noise", False)),
                 "noise_reason": getattr(flag, "noise_reason", None),
             }
@@ -617,8 +624,12 @@ _HTML_TEMPLATE = """<!doctype html>
         escapeHtml(data.noise_reason || 'unknown') + '. This picture is hidden from the markdown export.</div>';
     }}
     html += field('Caption', data.caption_text);
+    if (data.figure_type) {{
+      html += field('Figure type (BiomedCLIP)', data.figure_type +
+        ' (' + Math.round(100 * data.figure_type_confidence) + '%)');
+    }}
     html += field('VLM description', data.vlm_caption);
-    html += field('Classifier label', data.classifier_label);
+    html += field('Generic classifier (noise filter only)', data.generic_classifier_label);
     if (data.image_path) {{
       html += field('Image', '<img class="panel-thumbnail" src="' + escapeHtml(data.image_path) + '"/>', {{raw: true}});
     }}

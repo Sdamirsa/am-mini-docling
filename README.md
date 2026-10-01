@@ -7,7 +7,7 @@
 
 ```bash
 git clone https://github.com/Sdamirsa/am-mini-docling.git && cd am-mini-docling
-uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx   # install
+uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx --extra models-vlm-inline   # install
 uv run amir-batch my-paper.pdf -o out                                   # convert → out/my-paper/
 ```
 
@@ -16,7 +16,7 @@ That's it. Everything below is optional reading.
 
 ### 💻 Platform notes (Linux · DGX Spark · Windows)
 
-Same install command everywhere (`uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx`); only the PyTorch step differs. Needs [uv](https://docs.astral.sh/uv/) and Python 3.10+.
+Same install command everywhere (`uv sync --frozen --no-group docs --extra standard --extra feat-ocr-rapidocr-onnx --extra models-vlm-inline`); only the PyTorch step differs. Needs [uv](https://docs.astral.sh/uv/) and Python 3.10+.
 
 | Platform | Install | GPU |
 |---|---|---|
@@ -36,7 +36,7 @@ Paths work with either slash style (`out\my-paper` on Windows is fine); all outp
 | Middle — VLM figure descriptions, TableFormer tables | `amir-batch paper.pdf --no-granite-vision-tables` | **≥ 16 GB GPU** (measured peak 11.5 GiB) | ~2.3 min |
 | Fast — no VLMs | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | not required (peak 1.5 GiB when a GPU is present; CPU-only is slower, untimed) | ~1 min |
 
-Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory) with Docling v2.131.0, HF `transformers` backend, nothing else on the GPU. Peak = GPU memory of the conversion process; the minimums leave ~4–5 GiB headroom but haven't been tested on discrete 24 GB / 16 GB cards. First run downloads the Granite-Vision 4.1-4B weights (~13 GB on disk here).
+Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory) with Docling v2.131.0, HF `transformers` backend, nothing else on the GPU, before figure typing was added: BiomedCLIP (on in every mode, `--no-figure-types` to skip) adds ~0.8 GB GPU and ~15 ms per figure. Peak = GPU memory of the conversion process; the minimums leave ~4–5 GiB headroom but haven't been tested on discrete 24 GB / 16 GB cards. First run downloads the Granite-Vision 4.1-4B weights (~13 GB on disk here).
 
 ## 🧠 The suggested config (what `amir-batch` does by default)
 
@@ -45,7 +45,8 @@ Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory) with Docling v2.13
 | Layout + reading order | Docling **Heron** layout model | upstream default, fast |
 | Tables | **Granite-Vision 4.1-4B** (VLM, same weights as figures) | better than TableFormer on messy clinical tables |
 | Figure descriptions | **Granite-Vision 4.1-4B** (VLM) | one paragraph per figure → `figures.jsonl[*].vlm_caption` |
-| Figure classification | Docling picture classifier | tags + strips logos / repeated banners ("noise") |
+| Figure type | **BiomedCLIP** (zero-shot, PubMed-trained) | `ct`, `angiography`, `ecg`, `kaplan_meier`, `bar_chart`, ... → `figures.jsonl[*].figure_type` (83.5 % on a 97-figure medical sample vs 16.5 % for Docling's generic classifier) |
+| Noise filter | Docling generic picture classifier + bbox-repeat heuristic | tags + strips logos / badges / QR codes / repeated banners ("noise"); its generic label is *not* a figure type |
 | Chunking | Docling `HybridChunker`, MiniLM tokenizer, 512 tokens | ready for embeddings / RAG |
 
 VLM runtime: HF `transformers` by default; if [vLLM](https://github.com/vllm-project/vllm) is installed it is picked up automatically (`picture_description_engine="vllm"` to force). No LLM API calls: everything runs locally. The outputs are shaped so *your* LLM can read them (chunks, tables, figures as JSONL).
@@ -60,7 +61,7 @@ out/<pdf-name>/
 ├── <pdf-name>.embedded.md  📝 markdown, figures inlined (one file)
 ├── chunks.jsonl            🤖 text chunks + headings + page numbers + self_refs
 ├── tables.jsonl            🤖 one row per table: caption, markdown, html, cells
-├── figures.jsonl           🤖 one row per figure: caption, VLM description, class, noise flag
+├── figures.jsonl           🤖 one row per figure: caption, figure type, VLM description, noise flag
 ├── nodes.jsonl             🤖 every document node with bbox
 ├── document.json           🤖 full DoclingDocument (lossless)
 ├── run.json                🧾 models, options, timing, package versions

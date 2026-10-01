@@ -20,7 +20,7 @@ Landed paths differ from the original plan; see [AMIR_STAGE.md](AMIR_STAGE.md) f
 ## PHASE 2: Chunking + Structured JSON outputs — COMPLETE
 
 - [X] `docling/engines/chunker.py` — `write_chunks()` runs `HybridChunker`, writes `chunks.jsonl` (index, text, token_count, headings, captions, page_nos, self_refs). Tokenizer default: `sentence-transformers/all-MiniLM-L6-v2`, max_tokens=512.
-- [X] `docling/engines/structured_outputs.py` — `write_structured_outputs()` writes `tables.jsonl` (caption_text + markdown + html + flat cells with offsets/spans + dims) and `figures.jsonl` (caption_text + image_path + vlm_caption + classifier_label + is_noise + noise_reason).
+- [X] `docling/engines/structured_outputs.py` — `write_structured_outputs()` writes `tables.jsonl` (caption_text + markdown + html + flat cells with offsets/spans + dims) and `figures.jsonl` (caption_text + image_path + figure_type + vlm_caption + generic_classifier_label + is_noise + noise_reason).
 - [X] Wired into `PdfEngine.convert()` (auto-on when `save_artifacts=True`).
 - [X] `PdfConversionOutput` extended: `chunks_jsonl`, `tables_jsonl`, `figures_jsonl`, `run_json`, etc.
 

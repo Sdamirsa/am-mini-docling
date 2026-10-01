@@ -102,7 +102,7 @@ DOCLING_GEN_TEST_DATA=1 uv run pytest  # regen golden data (only when intended)
 instead — same coverage minus the ONNX-GPU OCR variant:
 
 ```bash
-uv sync --frozen --group dev --no-group docs --no-group examples --extra standard
+uv sync --frozen --group dev --no-group docs --no-group examples --extra standard --extra models-vlm-inline
 ```
 
 The `standard` extra pulls `format-pdf`, `models-local` (torch), `feat-ocr-rapidocr`,
@@ -131,7 +131,8 @@ out = PdfEngine(images_scale=1.5).convert(
 - `save_artifacts=True` (default) — `document.json`, `nodes.jsonl`, `chunks.jsonl`, `tables.jsonl`, `figures.jsonl`, `run.json`, image crops. Auto-enables page + picture image generation.
 - `link_images=True` (default) — primary `<stem>.md` rewrites `<!-- image -->` placeholders to `![](images/picture_NNN.png)`.
 - `embed_images=True` (default) — additionally writes `<stem>.embedded.md` with base64 data URIs.
-- `filter_noise_pictures=True` (default) — flags logos / watermarks / repeated banners (classifier + bbox-repeat heuristic). Strips them from both markdown files; tags `is_noise` in `figures.jsonl`.
+- `filter_noise_pictures=True` (default) — flags logos / watermarks / repeated banners (classifier + bbox-repeat heuristic). Strips them from both markdown files; tags `is_noise` in `figures.jsonl`. Uses Docling's generic DocumentFigureClassifier, whose labels have no medical classes — trusted for noise only (`generic_classifier_label`).
+- `figure_types=True` (default) — BiomedCLIP zero-shot figure type (`ct`, `angiography`, `ecg`, `kaplan_meier`, `bar_chart`, ...) in `docling/engines/figure_typing.py` → `figures.jsonl[*].figure_type` + `PictureItem.meta.amir__figure_type`. Needs `models-vlm-inline` extra.
 - `chunk_tokenizer="sentence-transformers/all-MiniLM-L6-v2"`, `chunk_max_tokens=512` — chunker config.
 - `granite_vision_tables=False` — opt-in: swap TableFormer for Granite-Vision VLM table structure (~2B model).
 - `picture_description=None` — set to `"smolvlm"`, `"granite_vision"`, `"pixtral"`, `"qwen25_vl_3b"` to add VLM captions to figures. `picture_description_engine="vllm"` (default) | `"transformers"` | `"default"`.

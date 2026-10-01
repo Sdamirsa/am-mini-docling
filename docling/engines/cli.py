@@ -115,6 +115,16 @@ def main(
             ),
         ),
     ] = "granite_vision_4b",
+    figure_types: Annotated[
+        bool,
+        typer.Option(
+            "--figure-types/--no-figure-types",
+            help=(
+                "Type every figure (ct, angiography, ecg, bar_chart, ...) with "
+                "BiomedCLIP. Default on; ~0.8 GB GPU, ~15 ms per figure."
+            ),
+        ),
+    ] = True,
 ) -> None:
     """Run ``PdfEngine`` (or the comparison runner) on every PDF found."""
     console = Console()
@@ -155,6 +165,7 @@ def main(
                         images_scale=images_scale,
                         granite_vision_tables=granite_vision_tables,
                         picture_description=picture_description,
+                        figure_types=figure_types,
                     )
                     if compare
                     else _run_single(
@@ -164,6 +175,7 @@ def main(
                         images_scale=images_scale,
                         granite_vision_tables=granite_vision_tables,
                         picture_description=picture_description,
+                        figure_types=figure_types,
                     )
                 )
             except Exception as exc:  # pragma: no cover - defensive
@@ -208,6 +220,7 @@ def _run_single(
     images_scale: float,
     granite_vision_tables: bool,
     picture_description: str,
+    figure_types: bool,
 ) -> dict:
     engine = PdfEngine(
         images_scale=images_scale,
@@ -215,6 +228,7 @@ def _run_single(
         picture_description=(
             picture_description if picture_description != "off" else None  # type: ignore[arg-type]
         ),
+        figure_types=figure_types,
     )
     t0 = _dt.datetime.now(_dt.timezone.utc)
     out = engine.convert(pdf_path, output_dir=output_dir, make_html_preview=preview)
@@ -231,6 +245,7 @@ def _run_compare(
     images_scale: float,
     granite_vision_tables: bool,
     picture_description: str,
+    figure_types: bool,
 ) -> dict:
     t0 = _dt.datetime.now(_dt.timezone.utc)
     res = run_comparison(
@@ -244,6 +259,7 @@ def _run_compare(
             "picture_description": (
                 picture_description if picture_description != "off" else None
             ),
+            "figure_types": figure_types,
         },
     )
     duration_s = (_dt.datetime.now(_dt.timezone.utc) - t0).total_seconds()

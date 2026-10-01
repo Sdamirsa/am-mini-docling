@@ -5,13 +5,20 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
+from docling_core.types.doc import DoclingDocument
 
 from docling.datamodel.base_models import ConversionStatus
 from docling.engines import PdfConversionOutput, PdfEngine, SourceKind
+from docling.engines.figure_typing import (
+    BIOMEDCLIP_REPO,
+    FIGURE_TYPES,
+    get_figure_type,
+)
 from docling.engines.validation import (
     InvalidPdfSourceError,
     classify_source,
@@ -67,6 +74,7 @@ def test_pdf_engine_converts_local_fixture(tmp_path: Path) -> None:
         embed_images=False,
         picture_description=None,
         granite_vision_tables=False,
+        figure_types=False,
     )
     output: PdfConversionOutput = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -112,6 +120,7 @@ def test_pdf_engine_renders_html_preview(tmp_path: Path) -> None:
         picture_description=None,
         granite_vision_tables=False,
         filter_noise_pictures=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path, make_html_preview=True)
 
@@ -147,6 +156,7 @@ def test_pdf_engine_writes_standalone_html_preview(tmp_path: Path) -> None:
         picture_description=None,
         granite_vision_tables=False,
         filter_noise_pictures=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path, make_html_preview=True)
 
@@ -171,6 +181,7 @@ def test_pdf_engine_writes_embedded_markdown_companion(tmp_path: Path) -> None:
         save_artifacts=True,
         picture_description=None,
         granite_vision_tables=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -204,6 +215,7 @@ def test_pdf_engine_links_images_in_primary_markdown(tmp_path: Path) -> None:
         save_artifacts=True,
         picture_description=None,
         granite_vision_tables=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -231,6 +243,7 @@ def test_pdf_engine_writes_artifacts(tmp_path: Path) -> None:
         save_artifacts=True,
         picture_description=None,
         granite_vision_tables=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -290,6 +303,7 @@ def test_pdf_engine_writes_chunks(tmp_path: Path) -> None:
         chunk_max_tokens=512,
         picture_description=None,
         granite_vision_tables=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
 
@@ -325,6 +339,7 @@ def test_pdf_engine_picture_description_config() -> None:
         embed_images=False,
         picture_description="qwen25_vl_3b",
         picture_description_engine="vllm",
+        figure_types=False,
     )
     opts = engine._pipeline_options
     assert opts is not None
@@ -342,7 +357,10 @@ def test_pdf_engine_granite_vision_tables_config() -> None:
     from docling.datamodel.pipeline_options import GraniteVisionTableStructureOptions
 
     engine = PdfEngine(
-        save_artifacts=False, embed_images=False, granite_vision_tables=True
+        save_artifacts=False,
+        embed_images=False,
+        granite_vision_tables=True,
+        figure_types=False,
     )
     assert isinstance(
         engine._pipeline_options.table_structure_options,
@@ -362,6 +380,7 @@ def test_pdf_engine_writes_structured_outputs(tmp_path: Path) -> None:
         embed_images=False,
         picture_description=None,
         granite_vision_tables=False,
+        figure_types=False,
     )
     output = engine.convert(FIXTURE_PDF, output_dir=tmp_path)
     assert output.succeeded, f"conversion failed: {output.errors}"
@@ -397,6 +416,38 @@ def test_pdf_engine_writes_structured_outputs(tmp_path: Path) -> None:
                 "caption_text",
                 "image_path",
                 "vlm_caption",
-                "classifier_label",
+                "figure_type",
+                "figure_type_confidence",
+                "generic_classifier_label",
             ):
                 assert key in row
+
+
+PICTURE_FIXTURE_PDF = Path("tests/data/pdf/sources/picture_classification.pdf")
+
+
+@pytest.mark.skipif(
+    not PICTURE_FIXTURE_PDF.exists() or importlib.util.find_spec("open_clip") is None,
+    reason="needs the picture_classification fixture and open-clip-torch",
+)
+def test_pdf_engine_types_figures(tmp_path: Path) -> None:
+    """BiomedCLIP types the fixture's stacked bar chart, and the type survives a
+    ``document.json`` round-trip as the ``amir__figure_type`` meta field."""
+    engine = PdfEngine(
+        images_scale=1.0,
+        embed_images=False,
+        picture_description=None,
+        granite_vision_tables=False,
+    )
+    output = engine.convert(PICTURE_FIXTURE_PDF, output_dir=tmp_path)
+    assert output.succeeded, f"conversion failed: {output.errors}"
+
+    rows = [json.loads(line) for line in output.figures_jsonl.read_text().splitlines()]
+    assert rows[0]["figure_type"] == "bar_chart"
+    assert rows[0]["figure_type_model"] == BIOMEDCLIP_REPO
+    assert all(row["figure_type"] in FIGURE_TYPES for row in rows)
+
+    reloaded = DoclingDocument.load_from_json(output.document_json)
+    prediction = get_figure_type(reloaded.pictures[0])
+    assert prediction is not None
+    assert prediction.label == "bar_chart"

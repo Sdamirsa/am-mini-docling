@@ -27,6 +27,7 @@ from docling.engines.chunker import (
     ChunkerError,
     write_chunks,
 )
+from docling.engines.figure_typing import BIOMEDCLIP_REPO, FigureTyper, type_pictures
 from docling.engines.picture_filter import (
     DEFAULT_NOISE_CLASSES,
     DEFAULT_REPEAT_THRESHOLD,
@@ -88,6 +89,7 @@ class PdfEngine:
         noise_repeat_threshold: int = DEFAULT_REPEAT_THRESHOLD,
         picture_description: PictureDescriptionPreset | None = "granite_vision_4b",
         picture_description_engine: PictureDescriptionEngine = "default",
+        figure_types: bool = True,
     ) -> None:
         """Initialise the engine.
 
@@ -159,6 +161,15 @@ class PdfEngine:
             when vLLM isn't installed; this is the default), ``"vllm"``
             (force vLLM — requires it installed), ``"transformers"`` (force
             transformers). Ignored when ``picture_description`` is None.
+        figure_types
+            When True (default), types every picture with BiomedCLIP into a
+            scientific/medical taxonomy (``ct``, ``angiography``, ``ecg``,
+            ``kaplan_meier``... see
+            :data:`~docling.engines.figure_typing.FIGURE_TYPES`). Lands in
+            ``figures.jsonl[*].figure_type`` and on ``PictureItem.meta``
+            (``amir__figure_type``) in ``document.json``. Needs picture
+            images (``save_artifacts`` or ``embed_images``) and the
+            ``models-vlm-inline`` extra (open-clip-torch); ~0.8 GB GPU.
         """
         self._image_scale = images_scale
         self._embed_images = embed_images
@@ -188,8 +199,10 @@ class PdfEngine:
             "picture_description_engine": picture_description_engine
             if picture_description
             else None,
+            "figure_types": BIOMEDCLIP_REPO if figure_types else None,
             "converter_supplied": converter is not None,
         }
+        self._figure_typer = FigureTyper() if figure_types else None
         if converter is not None:
             self._converter = converter
             self._pipeline_options: PdfPipelineOptions | None = None
@@ -278,6 +291,10 @@ class PdfEngine:
         finished_at = _dt.datetime.now(_dt.timezone.utc)
 
         output = self._build_output(result, kind=kind, normalised=normalised)
+
+        if output.succeeded and self._figure_typer is not None:
+            typed = type_pictures(result, self._figure_typer)
+            _log.info("PdfEngine: typed %d picture(s) with BiomedCLIP", typed)
 
         if output.succeeded and output_dir is not None:
             pdf_dir = _resolve_pdf_dir(output_dir, normalised, result)

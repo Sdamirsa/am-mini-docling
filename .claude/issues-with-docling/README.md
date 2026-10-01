@@ -17,3 +17,4 @@ a reproducer, root-cause hypothesis, and tested workarounds (if any).
 | File | One-line summary |
 |---|---|
 | [reading-order-mixed-layout-page.md](reading-order-mixed-layout-page.md) | Column-flip on a page that mixes full-width (abstract spillover) and two-column body regions. |
+| [opencv5-resize-segfault-aarch64.md](opencv5-resize-segfault-aarch64.md) | Intermittent SIGSEGV in RapidOCR's `cv2.resize` (OpenCV 5.0.0, aarch64) that kills a whole `amir-batch` run. |

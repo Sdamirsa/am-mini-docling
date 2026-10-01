@@ -8,9 +8,11 @@ doesn't expose flat:
 
 * For tables: ``markdown`` / ``html`` renderings, cell offsets/spans, and a
   resolved ``caption_text``.
-* For figures: ``vlm_caption`` (when picture description is on),
-  ``classifier_label`` (when picture classifier is on), and
-  ``caption_text`` resolved from caption refs.
+* For figures: ``figure_type`` + ``figure_type_confidence`` (BiomedCLIP,
+  see :mod:`docling.engines.figure_typing`), ``vlm_caption`` (when picture
+  description is on), ``generic_classifier_label`` (Docling's generic
+  document-figure classifier — no medical classes, only meaningful for the
+  noise filter), and ``caption_text`` resolved from caption refs.
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from docling_core.types.doc import PictureItem, TableItem
+
+from docling.engines.figure_typing import get_figure_type
 
 if TYPE_CHECKING:
     from docling.datamodel.document import ConversionResult
@@ -232,6 +236,7 @@ def _figure_row(
     classifier_label = _picture_classifier_label(item) or (
         getattr(noise_flag, "classifier_label", None) if noise_flag else None
     )
+    figure_type = get_figure_type(item)
     return {
         "index": index,
         "self_ref": getattr(item, "self_ref", None),
@@ -240,8 +245,11 @@ def _figure_row(
         "caption_text": item.caption_text(doc) if hasattr(item, "caption_text") else "",
         "references": refs,
         "image_path": _safe_relative(image_path, pdf_dir),
+        "figure_type": figure_type.label if figure_type else None,
+        "figure_type_confidence": figure_type.confidence if figure_type else None,
+        "figure_type_model": figure_type.model if figure_type else None,
         "vlm_caption": _picture_annotation_caption(item),
-        "classifier_label": classifier_label,
+        "generic_classifier_label": classifier_label,
         "is_noise": bool(getattr(noise_flag, "is_noise", False)),
         "noise_reason": getattr(noise_flag, "noise_reason", None),
         "annotations": [
