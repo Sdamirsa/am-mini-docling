@@ -11,12 +11,14 @@ Pick the folder that matches your hardware and open its `preview.embedded.html`.
 
 | Folder | Command | Figures | Tables | GPU | Time* |
 |---|---|---|---|---|---|
-| [`fast/`](fast/Public-test-manuscript/) | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | caption + class only | TableFormer | not required | **1.4 min** |
-| [`figures-vlm/`](figures-vlm/Public-test-manuscript/) | `amir-batch paper.pdf --no-granite-vision-tables` | + VLM description | TableFormer | yes (one 4B VLM) | **3.4 min** |
-| [`default/`](default/Public-test-manuscript/) | `amir-batch paper.pdf` | + VLM description | Granite-Vision VLM | ≥ 32 GB (peak 25.5 GB) | **13.2 min** |
+| [`fast/`](fast/Public-test-manuscript/) | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | caption + class only | TableFormer | not required (peak 1.5 GiB) | **56 s** |
+| [`figures-vlm/`](figures-vlm/Public-test-manuscript/) | `amir-batch paper.pdf --no-granite-vision-tables` | + VLM description | TableFormer | ≥ 16 GB (peak 11.5 GiB) | **2.3 min** |
+| [`default/`](default/Public-test-manuscript/) | `amir-batch paper.pdf` | + VLM description | Granite-Vision VLM | ≥ 24 GB (peak 18.8 GiB) | **11.8 min** |
 
-\*NVIDIA GB10 (DGX Spark). `fast` and `figures-vlm` ran while an unrelated
-Ollama server shared the GPU, so their times are upper bounds.
+\*Clean runs on an NVIDIA GB10 (DGX Spark) with Docling v2.131.0 and nothing
+else on the GPU. Peak = GPU memory of the conversion process. The `default/`
+folder itself was generated before the v2.131.0 sync (see Versions below);
+that older code peaked at 25.5 GB and took 13.2 min.
 
 No config calls an external LLM API: everything runs locally. The only VLM is
 [Granite-Vision 4.1-4B](https://huggingface.co/ibm-granite/granite-vision-4.1-4b)
@@ -47,7 +49,7 @@ check figures themselves before citing a value.
 | 14 (temperature) | 8 × 3 | ❌ 7 × 3 | ✅ 8 × 3 |
 | 17 (sparse, many empty cols) | ~9 cols | ❌ | ❌ |
 
-Takeaway: `figures-vlm` is ~4× faster than `default` with similar table
+Takeaway: `figures-vlm` is ~5× faster than `default` with similar table
 quality on this paper. `default` is kept as the suggested config because it
 wins on some dense tables; try both on your own documents.
 
