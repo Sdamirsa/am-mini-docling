@@ -27,7 +27,12 @@ from docling.engines.chunker import (
     ChunkerError,
     write_chunks,
 )
-from docling.engines.figure_typing import BIOMEDCLIP_REPO, FigureTyper, type_pictures
+from docling.engines.figure_typing import (
+    BIOMEDCLIP_REPO,
+    TEXT_EXPORT_META_PARAMS,
+    FigureTyper,
+    type_pictures,
+)
 from docling.engines.picture_filter import (
     DEFAULT_NOISE_CLASSES,
     DEFAULT_REPEAT_THRESHOLD,
@@ -445,7 +450,7 @@ class PdfEngine:
         }:
             try:
                 markdown = result.document.export_to_markdown(
-                    image_mode=ImageRefMode.PLACEHOLDER
+                    image_mode=ImageRefMode.PLACEHOLDER, **TEXT_EXPORT_META_PARAMS
                 )
             except Exception as exc:  # pragma: no cover - defensive
                 _log.warning("PdfEngine: markdown export failed: %s", exc)
@@ -483,7 +488,7 @@ class PdfEngine:
     ) -> Path | None:
         try:
             embedded = result.document.export_to_markdown(
-                image_mode=ImageRefMode.EMBEDDED
+                image_mode=ImageRefMode.EMBEDDED, **TEXT_EXPORT_META_PARAMS
             )
         except Exception as exc:
             _log.warning("PdfEngine: embedded markdown export failed: %s", exc)

@@ -82,6 +82,16 @@ _META_NAMESPACE = "amir"
 _META_NAME = "figure_type"
 META_KEY = MetaUtils.create_meta_field_name(namespace=_META_NAMESPACE, name=_META_NAME)
 
+# Serializer params for text exports (markdown, chunks): leave model-guessed
+# picture labels out of the text. docling-core would otherwise append the
+# generic classifier label ("Line chart" under an ECG) and the repr of
+# META_KEY's dict to every picture; both stay available as structured data in
+# figures.jsonl / document.json.
+TEXT_EXPORT_META_PARAMS: dict[str, Any] = {
+    "include_picture_classification": False,
+    "blocked_meta_names": {META_KEY},
+}
+
 
 class FigureTypePrediction(BaseModel):
     """Top-1 figure type for one picture."""

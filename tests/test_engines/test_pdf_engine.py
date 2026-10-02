@@ -469,10 +469,10 @@ PICTURE_FIXTURE_PDF = Path("tests/data/pdf/sources/picture_classification.pdf")
 )
 def test_pdf_engine_types_figures(tmp_path: Path) -> None:
     """BiomedCLIP types the fixture's stacked bar chart, and the type survives a
-    ``document.json`` round-trip as the ``amir__figure_type`` meta field."""
+    ``document.json`` round-trip as the ``amir__figure_type`` meta field —
+    without leaking into the text exports (markdown, chunks)."""
     engine = PdfEngine(
         images_scale=1.0,
-        embed_images=False,
         picture_description=None,
         granite_vision_tables=False,
     )
@@ -488,3 +488,14 @@ def test_pdf_engine_types_figures(tmp_path: Path) -> None:
     prediction = get_figure_type(reloaded.pictures[0])
     assert prediction is not None
     assert prediction.label == "bar_chart"
+
+    # The fixture's text is lorem ipsum, so "Bar chart" could only come from the
+    # generic classifier label, and "'label'" from the figure-type dict.
+    texts = {
+        "markdown": output.markdown,
+        "embedded": output.markdown_embedded_path.read_text(encoding="utf-8"),
+        "chunks": output.chunks_jsonl.read_text(encoding="utf-8"),
+    }
+    for name, text in texts.items():
+        assert "Bar chart" not in text, name
+        assert "'label'" not in text, name

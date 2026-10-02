@@ -31,9 +31,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from docling_core.transforms.chunker import HybridChunker
+from docling_core.transforms.chunker.hierarchical_chunker import (
+    ChunkingDocSerializer,
+    ChunkingSerializerProvider,
+)
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 
+from docling.engines.figure_typing import TEXT_EXPORT_META_PARAMS
+
 if TYPE_CHECKING:
+    from docling_core.types.doc import DoclingDocument
+
     from docling.datamodel.document import ConversionResult
 
 _log = logging.getLogger(__name__)
@@ -46,6 +54,16 @@ DEFAULT_MAX_TOKENS = 512  # matches MiniLM model_max_length; bump alongside toke
 
 class ChunkerError(RuntimeError):
     """Raised when chunking cannot complete."""
+
+
+class _SerializerProvider(ChunkingSerializerProvider):
+    """Docling's chunking serializer minus model-guessed picture labels."""
+
+    def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
+        params = ChunkingDocSerializer(doc=doc).params.model_copy(
+            update=TEXT_EXPORT_META_PARAMS
+        )
+        return ChunkingDocSerializer(doc=doc, params=params)
 
 
 @dataclass
@@ -76,7 +94,11 @@ def write_chunks(
     tokenizer = HuggingFaceTokenizer.from_pretrained(
         model_name=tokenizer_repo, max_tokens=max_tokens
     )
-    chunker = HybridChunker(tokenizer=tokenizer, merge_peers=merge_peers)
+    chunker = HybridChunker(
+        tokenizer=tokenizer,
+        merge_peers=merge_peers,
+        serializer_provider=_SerializerProvider(),
+    )
 
     count = 0
     with target.open("w", encoding="utf-8") as fh:
