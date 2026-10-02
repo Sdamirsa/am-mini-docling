@@ -119,8 +119,6 @@ Figure 1. Summary of the data and LLM components, along with the three experimen
 
 ![](images/picture_001.png)
 
-Flow chart
-
 Image Description: The right column shows  the components of multiple-choice questions, large language models (LLMs), and vision language models (VLMs). Experiment 0 aims to find optimized model parameters, including the input text itself, function ( i.e. , the method used to provide input and obtain output), max-token (the total number of output tokens, including the input length), and temperature (which determines the randomness in the output text). The models in Experiment 1 and the labels used during evaluation are highlighted in green. The blue box illustrates the four scenarios  of  providing questions  along with  (1) no image data, (2) LLM-generated descriptions,  (3) images directly, and (4) human-generated descriptions.
 
 ## Experiment 0: LLM Setting Optimization
@@ -209,8 +207,6 @@ Figure 2. Semiautomated evaluation pipeline for LLM responses
 
 ![](images/picture_002.png)
 
-Flow chart
-
 Image Description: We used a semiautomated approach to evaluate LLM answers. LLM responses can be structured ( i.e. ,  the  output is a dictionary-like object) or unstructured ( i.e. ,  raw textual response). To evaluate the structured outputs, we  read (parsed) the dictionary, retrieved  the selected option, and compared it to the correct  option for evaluation. For all other models in web interfaces, Poe, or local computer environments with unstructured responses, we used GPT-3.5 to extract the selected option from the raw textual response. For uncertain labels marked by GPT3.5, a human evaluator assessed the response. The final labels were as follows: correct, when the LLM chose one option that was correct; incorrect, when the LLM chose one or two options that were incorrect; 2OP, when the LLM chose two options that were correct; EOP, when the LLM selected an external option or answer; NOP, when the LLM avoided providing options due to a lack of sufficient information; and Error, when the LLM answer was incomplete or nonsense due to a technical error after two tries.
 
 ## Performance stratified by question type
@@ -243,8 +239,6 @@ We found that the choice of model settings, prompt strategy, and use of structur
 
 ![](images/picture_003.png)
 
-Bar chart
-
 Accuracy (%)
 
 Accuracy (%)
@@ -267,8 +261,6 @@ Figure 4. LLM Performance on Text-Only Gastroenterology Multiple-choice Question
 
 ![](images/picture_004.png)
 
-Bar chart
-
 Image Description: The figure shows the performance of large language models (LLMs) on Gastroenterology Board Exam questions. The bars are clustered considering model families (architecture) and sorted from oldest to the newest in the clusters. The quantified models and models fine-tuned on medical data are highlighted with pink and blue icons, respectively.
 
 2OP means that two options were chosen, one of which is the correct option. EOP means that an external option was chosen that was not included in the provided options. NOP means that no option was selected by LLM due to the need for caution. Error means that no rational answer was provided due to failure in generation or an unrelated response after two tries.
@@ -287,8 +279,6 @@ Figure 5. VLM Performance on Gastroenterology Multiple-Choice Questions with Ima
 
 ![](images/picture_005.png)
 
-Bar chart
-
 Image Description: Performance of three vision language models in two environments in four scenarios. The first bar shows the "no image" scenario where models only have the question stem without any image information, representing the baseline performance. The second bar displays the scenario where captions are generated via VLM, and then the question stem and VLM-generated captions are provided. The third bar shows the scenario of directly providing the image along with the question stem. The fourth bar shows the scenario of providing a short human hint derived from the image along with the question stem, representing the maximum performance when having the ground truth of the image.
 
 ## Historic Performance of GPT Models
@@ -298,8 +288,6 @@ LLM performance varied on the 2021, 2022, and 2023 versions of the examination, 
 Figure 6. Historical performance of GPT models on gastroenterology MCQ: (a) three ACG
 
 ![](images/picture_006.png)
-
-Line chart
 
 datasets published in 2021, 2022, and 2023 and (b) training data cutoff dates  of GPT models.
 
@@ -314,8 +302,6 @@ During our setup experiments, we noted inconsistent model outputs across multipl
 Figure  7.  The  impacts  of  temperature,  prompt  design,  and  random  seeds  on  GPT-3.5 consistency are important.
 
 ![](images/picture_007.png)
-
-Line chart
 
 Image description: The image shows the number of correct answers in three runs of GPT-3.5 without setting the seed parameter (a and b) and when the seed parameter is determined (c and d). It also depicts the impact of using a simple raw prompt (a and c) versus an optimized, engineered prompt (b and d). The shaded areas indicate the minimum and maximum values, and the dots represent the average number of correct answers across the three runs. The temperature with the highest accuracy is highlighted by a red outline, and the temperature with the highest consistency (lowest minimum-maximum range) is highlighted by an orange outline.
 
@@ -715,8 +701,6 @@ Supplementary  Figure  S1.  Details  of  semiautomated  answer  extraction  from
 
 ![](images/picture_008.png)
 
-Flow chart
-
 ## 5.1 Extracting Answers from Raw Output Utilizing GPT3.5
 
 For models providing structured output, the correctness of the answer was evaluated by comparing the ground truth and LLM answer via python code. For models without a structured output, the selected  option  was  extracted  via  the  OpenAI  extraction  schema.  The  GPT3.5-API  has  a temperature  of  0  and  a  maximum  number  of  tokens  for  generation  of  50,  with  the  following command:
@@ -738,8 +722,6 @@ In Experiment 1, we conducted 33 LLM runs on 300 questions from ACG 2022. Eight 
 Supplementary Figure S2. Confusion matrix of GPT-3.5 performance in the extraction of selected options from the raw textual response of LLMs.
 
 ![](images/picture_009.png)
-
-Bar chart
 
 | GPT-3.5 Extracted Option from LLM Textual Response   | GPT-3.5 Extracted Option from LLM Textual Response   |   GPT-3.5 Extracted Option from LLM Textual Response - B |   GPT-3.5 Extracted Option from LLM Textual Response - C |   GPT-3.5 Extracted Option from LLM Textual Response |   GPT-3.5 Extracted Option from LLM Textual Response - E |   GPT-3.5 Extracted Option from LLM Textual Response | GPT-3.5 Extracted Option from LLM Textual Response - GPT: Require Evaluation Parsing Failed   |
 |------------------------------------------------------|------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
@@ -787,19 +769,13 @@ Supplementary  Figure  S3. Granular  performance  of  LLMs  (Experiment  1)  and
 
 ![](images/picture_010.png)
 
-Table
-
 ## Supplementary  Figure  S4.  Performance  Stratified  by  Image-Inclusive  and  Text-Based Questions
 
 ![](images/picture_011.png)
 
-Bar chart
-
 ## Supplementary Figure S5. Performance Stratified by Question Subject
 
 ![](images/picture_012.png)
-
-Calendar
 
 ## Supplementary Figure S6. Performance stratified by patient care phase
 
@@ -807,19 +783,13 @@ L
 
 ![](images/picture_013.png)
 
-Bar chart
-
 ## Supplementary Figure S7. Performance Stratified by Question Difficulty
 
 ![](images/picture_014.png)
 
-Bar chart
-
 ## Supplementary Figure S8. Performance stratified by the question length
 
 ![](images/picture_015.png)
-
-Bar chart
 
 ## Supplementary Table S5. The cost and time of executing one question with an average length
 

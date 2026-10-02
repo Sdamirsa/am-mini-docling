@@ -8,9 +8,9 @@
   },
   "status": "ConversionStatus.SUCCESS",
   "timing": {
-    "started_at": "2026-09-29T13:53:19.619852+00:00",
-    "finished_at": "2026-09-29T14:06:32.605987+00:00",
-    "duration_seconds": 792.986
+    "started_at": "2026-10-02T07:33:06.308086+00:00",
+    "finished_at": "2026-10-02T07:44:43.116222+00:00",
+    "duration_seconds": 696.808
   },
   "engine_config": {
     "with_page_images": false,
@@ -23,7 +23,9 @@
     "granite_vision_tables": true,
     "filter_noise_pictures": true,
     "noise_picture_classes": [
+      "bar_code",
       "barcode",
+      "icon",
       "logo",
       "page_footer",
       "page_header",
@@ -36,6 +38,7 @@
     "noise_repeat_threshold": 3,
     "picture_description": "granite_vision_4b",
     "picture_description_engine": "default",
+    "figure_types": "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
     "converter_supplied": false
   },
   "pipeline_options": {
@@ -54,7 +57,7 @@
         "engine_type": "transformers",
         "top_k": null,
         "torch_dtype": null,
-        "compile_model": true
+        "compile_model": false
       },
       "model_spec": {
         "name": "document_figure_classifier_v2",
@@ -78,7 +81,7 @@
       "model_spec": {
         "name": "Granite-Vision-4.1-4B",
         "default_repo_id": "ibm-granite/granite-vision-4.1-4b",
-        "revision": "main",
+        "revision": "dd48e97503de471803850df70843cf9eb5da8712",
         "prompt": "What is shown in this image? Describe it in 1-2 concise factual sentences.",
         "response_format": "plaintext",
         "supported_engines": null,
@@ -86,17 +89,19 @@
           "transformers": {
             "repo_id": null,
             "revision": null,
-            "torch_dtype": null,
+            "torch_dtype": "bfloat16",
+            "min_engine_version": null,
             "extra_config": {
-              "attn_implementation": "eager",
               "transformers_model_type": "automodel-imagetexttotext"
             }
           }
         },
         "api_overrides": {},
-        "trust_remote_code": false,
+        "trust_remote_code": true,
         "stop_strings": [],
-        "max_new_tokens": 200
+        "temperature": 0.0,
+        "max_new_tokens": 200,
+        "extra_generation_config": {}
       },
       "prompt": "Describe this image in a few sentences.",
       "generation_config": {
@@ -106,11 +111,68 @@
     },
     "do_chart_extraction": false,
     "chart_extraction_options": {
-      "kind": "chart_extraction",
-      "model": "granite-vision-v4",
+      "engine_options": {
+        "engine_type": "transformers",
+        "device": null,
+        "load_in_8bit": true,
+        "llm_int8_threshold": 6.0,
+        "quantized": false,
+        "torch_dtype": null,
+        "trust_remote_code": true,
+        "use_kv_cache": true,
+        "compile_model": false
+      },
+      "model_spec": {
+        "name": "Granite-Vision-4.1-4B",
+        "default_repo_id": "ibm-granite/granite-vision-4.1-4b",
+        "revision": "dd48e97503de471803850df70843cf9eb5da8712",
+        "prompt": "<chart2csv>",
+        "response_format": "plaintext",
+        "supported_engines": [
+          "transformers",
+          "api_openai",
+          "api_ollama",
+          "api_lmstudio"
+        ],
+        "engine_overrides": {
+          "transformers": {
+            "repo_id": null,
+            "revision": null,
+            "torch_dtype": "bfloat16",
+            "min_engine_version": null,
+            "extra_config": {
+              "transformers_model_type": "automodel-imagetexttotext"
+            }
+          }
+        },
+        "api_overrides": {
+          "api_lmstudio": {
+            "params": {
+              "model": "granite-vision-4.1-4b"
+            }
+          },
+          "api_ollama": {
+            "params": {
+              "model": "granite-vision-4.1-4b"
+            }
+          },
+          "api_openai": {
+            "params": {
+              "model": "granite-vision-4.1-4b"
+            }
+          }
+        },
+        "trust_remote_code": true,
+        "stop_strings": [],
+        "temperature": 0.0,
+        "max_new_tokens": 4096,
+        "extra_generation_config": {}
+      },
       "chart2csv": true,
+      "chart2summary": false,
       "chart2code": false,
-      "chart2summary": false
+      "output_format": "granite_vision_charts",
+      "use_natural_language_prompts": false
     },
     "images_scale": 1.5,
     "generate_page_images": true,
@@ -122,25 +184,36 @@
     "force_backend_text": false,
     "table_structure_options": {},
     "ocr_options": {
+      "mode": "default",
       "lang": [],
-      "force_full_page_ocr": false,
-      "bitmap_area_threshold": 0.05
+      "scale": 3.0,
+      "force_full_page_ocr": false
     },
     "layout_options": {
       "keep_empty_clusters": false,
       "skip_cell_assignment": false,
       "create_orphan_clusters": true,
+      "engine_options": {
+        "engine_type": "transformers",
+        "score_threshold": 0.3,
+        "torch_dtype": null,
+        "compile_model": false
+      },
       "model_spec": {
-        "name": "docling_layout_heron",
+        "name": "layout_heron",
         "repo_id": "docling-project/docling-layout-heron",
         "revision": "main",
-        "model_path": "",
-        "supported_devices": [
-          "cpu",
-          "cuda",
-          "mps",
-          "xpu"
-        ]
+        "engine_overrides": {
+          "onnxruntime": {
+            "repo_id": "docling-project/docling-layout-heron-onnx",
+            "revision": null,
+            "torch_dtype": null,
+            "min_engine_version": null,
+            "extra_config": {
+              "model_filename": "model.onnx"
+            }
+          }
+        }
       }
     },
     "code_formula_options": {
@@ -160,6 +233,7 @@
             "repo_id": null,
             "revision": null,
             "torch_dtype": null,
+            "min_engine_version": null,
             "extra_config": {
               "transformers_model_type": "automodel-imagetexttotext",
               "extra_generation_config": {
@@ -175,7 +249,9 @@
           "</doctag>",
           "<end_of_utterance>"
         ],
-        "max_new_tokens": 4096
+        "temperature": 0.0,
+        "max_new_tokens": 4096,
+        "extra_generation_config": {}
       },
       "scale": 2.0,
       "max_size": null,
@@ -184,34 +260,57 @@
     },
     "generate_table_images": false,
     "generate_parsed_pages": false,
+    "heading_hierarchy_options": {
+      "enabled": false,
+      "use_bookmarks": true,
+      "use_numbering": true,
+      "use_style": true,
+      "use_font_style": true,
+      "style_size_tolerance": 0.05,
+      "numbering_schemes": null,
+      "max_level": 6,
+      "bookmark_match_threshold": 0.8
+    },
     "ocr_batch_size": 4,
     "layout_batch_size": 4,
     "table_batch_size": 4,
     "batch_polling_interval_seconds": 0.5,
-    "queue_max_size": 100
+    "queue_max_size": 100,
+    "stage_shutdown_timeout_seconds": 15.0
   },
   "models": {
     "layout": {
       "keep_empty_clusters": false,
       "skip_cell_assignment": false,
       "create_orphan_clusters": true,
+      "engine_options": {
+        "engine_type": "transformers",
+        "score_threshold": 0.3,
+        "torch_dtype": null,
+        "compile_model": false
+      },
       "model_spec": {
-        "name": "docling_layout_heron",
+        "name": "layout_heron",
         "repo_id": "docling-project/docling-layout-heron",
         "revision": "main",
-        "model_path": "",
-        "supported_devices": [
-          "cpu",
-          "cuda",
-          "mps",
-          "xpu"
-        ]
+        "engine_overrides": {
+          "onnxruntime": {
+            "repo_id": "docling-project/docling-layout-heron-onnx",
+            "revision": null,
+            "torch_dtype": null,
+            "min_engine_version": null,
+            "extra_config": {
+              "model_filename": "model.onnx"
+            }
+          }
+        }
       }
     },
     "ocr": {
+      "mode": "default",
       "lang": [],
-      "force_full_page_ocr": false,
-      "bitmap_area_threshold": 0.05
+      "scale": 3.0,
+      "force_full_page_ocr": false
     },
     "table_structure": {},
     "picture_description": {
@@ -228,7 +327,7 @@
       "model_spec": {
         "name": "Granite-Vision-4.1-4B",
         "default_repo_id": "ibm-granite/granite-vision-4.1-4b",
-        "revision": "main",
+        "revision": "dd48e97503de471803850df70843cf9eb5da8712",
         "prompt": "What is shown in this image? Describe it in 1-2 concise factual sentences.",
         "response_format": "plaintext",
         "supported_engines": null,
@@ -236,17 +335,19 @@
           "transformers": {
             "repo_id": null,
             "revision": null,
-            "torch_dtype": null,
+            "torch_dtype": "bfloat16",
+            "min_engine_version": null,
             "extra_config": {
-              "attn_implementation": "eager",
               "transformers_model_type": "automodel-imagetexttotext"
             }
           }
         },
         "api_overrides": {},
-        "trust_remote_code": false,
+        "trust_remote_code": true,
         "stop_strings": [],
-        "max_new_tokens": 200
+        "temperature": 0.0,
+        "max_new_tokens": 200,
+        "extra_generation_config": {}
       },
       "prompt": "Describe this image in a few sentences.",
       "generation_config": {
@@ -259,7 +360,7 @@
         "engine_type": "transformers",
         "top_k": null,
         "torch_dtype": null,
-        "compile_model": true
+        "compile_model": false
       },
       "model_spec": {
         "name": "document_figure_classifier_v2",
@@ -285,6 +386,7 @@
             "repo_id": null,
             "revision": null,
             "torch_dtype": null,
+            "min_engine_version": null,
             "extra_config": {
               "transformers_model_type": "automodel-imagetexttotext",
               "extra_generation_config": {
@@ -300,7 +402,9 @@
           "</doctag>",
           "<end_of_utterance>"
         ],
-        "max_new_tokens": 4096
+        "temperature": 0.0,
+        "max_new_tokens": 4096,
+        "extra_generation_config": {}
       },
       "scale": 2.0,
       "max_size": null,
@@ -308,11 +412,68 @@
       "extract_formulas": true
     },
     "chart_extraction": {
-      "kind": "chart_extraction",
-      "model": "granite-vision-v4",
+      "engine_options": {
+        "engine_type": "transformers",
+        "device": null,
+        "load_in_8bit": true,
+        "llm_int8_threshold": 6.0,
+        "quantized": false,
+        "torch_dtype": null,
+        "trust_remote_code": true,
+        "use_kv_cache": true,
+        "compile_model": false
+      },
+      "model_spec": {
+        "name": "Granite-Vision-4.1-4B",
+        "default_repo_id": "ibm-granite/granite-vision-4.1-4b",
+        "revision": "dd48e97503de471803850df70843cf9eb5da8712",
+        "prompt": "<chart2csv>",
+        "response_format": "plaintext",
+        "supported_engines": [
+          "transformers",
+          "api_openai",
+          "api_ollama",
+          "api_lmstudio"
+        ],
+        "engine_overrides": {
+          "transformers": {
+            "repo_id": null,
+            "revision": null,
+            "torch_dtype": "bfloat16",
+            "min_engine_version": null,
+            "extra_config": {
+              "transformers_model_type": "automodel-imagetexttotext"
+            }
+          }
+        },
+        "api_overrides": {
+          "api_lmstudio": {
+            "params": {
+              "model": "granite-vision-4.1-4b"
+            }
+          },
+          "api_ollama": {
+            "params": {
+              "model": "granite-vision-4.1-4b"
+            }
+          },
+          "api_openai": {
+            "params": {
+              "model": "granite-vision-4.1-4b"
+            }
+          }
+        },
+        "trust_remote_code": true,
+        "stop_strings": [],
+        "temperature": 0.0,
+        "max_new_tokens": 4096,
+        "extra_generation_config": {}
+      },
       "chart2csv": true,
+      "chart2summary": false,
       "chart2code": false,
-      "chart2summary": false
+      "output_format": "granite_vision_charts",
+      "use_natural_language_prompts": false
     },
     "accelerator": {
       "num_threads": 4,
@@ -333,13 +494,13 @@
     "system": "Linux",
     "packages": {
       "docling": null,
-      "docling-core": "2.75.0",
-      "docling-ibm-models": "3.13.2",
-      "docling-parse": "5.11.0",
-      "onnxruntime": "1.23.2",
+      "docling-core": "2.98.0",
+      "docling-ibm-models": "4.0.2",
+      "docling-parse": "7.20.0",
+      "onnxruntime": "1.29.0",
       "onnxruntime-gpu": null,
-      "pypdfium2": "5.8.0",
-      "transformers": "5.8.1"
+      "pypdfium2": "5.13.0",
+      "transformers": "5.17.0"
     }
   },
   "output_summary": {

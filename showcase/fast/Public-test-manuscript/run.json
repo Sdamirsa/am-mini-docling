@@ -8,9 +8,9 @@
   },
   "status": "ConversionStatus.SUCCESS",
   "timing": {
-    "started_at": "2026-09-29T15:22:49.619735+00:00",
-    "finished_at": "2026-09-29T15:24:15.126657+00:00",
-    "duration_seconds": 85.507
+    "started_at": "2026-10-02T07:29:28.036821+00:00",
+    "finished_at": "2026-10-02T07:30:24.601874+00:00",
+    "duration_seconds": 56.565
   },
   "engine_config": {
     "with_page_images": false,
@@ -23,7 +23,9 @@
     "granite_vision_tables": false,
     "filter_noise_pictures": true,
     "noise_picture_classes": [
+      "bar_code",
       "barcode",
+      "icon",
       "logo",
       "page_footer",
       "page_header",
@@ -36,6 +38,7 @@
     "noise_repeat_threshold": 3,
     "picture_description": null,
     "picture_description_engine": null,
+    "figure_types": "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
     "converter_supplied": false
   },
   "pipeline_options": {
@@ -139,10 +142,10 @@
         "prompt": "<chart2csv>",
         "response_format": "plaintext",
         "supported_engines": [
-          "transformers",
-          "api_openai",
           "api_lmstudio",
-          "api_ollama"
+          "transformers",
+          "api_ollama",
+          "api_openai"
         ],
         "engine_overrides": {
           "transformers": {
@@ -459,10 +462,10 @@
         "prompt": "<chart2csv>",
         "response_format": "plaintext",
         "supported_engines": [
-          "transformers",
-          "api_openai",
           "api_lmstudio",
-          "api_ollama"
+          "transformers",
+          "api_ollama",
+          "api_openai"
         ],
         "engine_overrides": {
           "transformers": {

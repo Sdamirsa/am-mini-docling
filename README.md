@@ -33,10 +33,10 @@ Paths work with either slash style (`out\my-paper` on Windows is fine); all outp
 | Mode | Command | GPU | Speed (68-page paper) |
 |---|---|---|---|
 | **Suggested (default)** — VLM figure descriptions + VLM tables | `amir-batch paper.pdf` | **≥ 24 GB GPU** (measured peak **18.8 GiB**) | ~12 min |
-| Middle — VLM figure descriptions, TableFormer tables | `amir-batch paper.pdf --no-granite-vision-tables` | **≥ 16 GB GPU** (measured peak 11.5 GiB) | ~2.3 min |
-| Fast — no VLMs | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | not required (peak 1.5 GiB when a GPU is present; CPU-only is slower, untimed) | ~1 min |
+| Middle — VLM figure descriptions, TableFormer tables | `amir-batch paper.pdf --no-granite-vision-tables` | **≥ 16 GB GPU** (measured peak 11.5 GiB) | ~2.4 min |
+| Fast — no VLMs | `amir-batch paper.pdf --picture-description off --no-granite-vision-tables` | not required (peak 1.6 GiB when a GPU is present; CPU-only is slower, untimed) | ~1 min |
 
-Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory) with Docling v2.131.0, HF `transformers` backend, nothing else on the GPU, before figure typing was added: BiomedCLIP (on in every mode, `--no-figure-types` to skip) adds ~0.8 GB GPU and ~15 ms per figure. Peak = GPU memory of the conversion process; the minimums leave ~4–5 GiB headroom but haven't been tested on discrete 24 GB / 16 GB cards. First run downloads the Granite-Vision 4.1-4B weights (~13 GB on disk here).
+Measured on an NVIDIA GB10 (DGX Spark, 128 GB unified memory) with Docling v2.131.0, HF `transformers` backend, nothing else on the GPU, BiomedCLIP figure typing on (every mode; `--no-figure-types` to skip, ~15 ms per figure). Peak = GPU memory of the conversion process; the minimums leave ~4–5 GiB headroom but haven't been tested on discrete 24 GB / 16 GB cards. First run downloads the Granite-Vision 4.1-4B weights (~13 GB on disk here).
 
 ## 🧠 The suggested config (what `amir-batch` does by default)
 
@@ -76,14 +76,14 @@ Input: [`showcase/Public-test-manuscript.pdf`](showcase/Public-test-manuscript.p
 
 | Config | Output | Time |
 |---|---|---|
-| Fast (no VLM) | [`showcase/fast/`](showcase/fast/Public-test-manuscript/) | 56 s |
-| Middle (VLM on figures only) | [`showcase/figures-vlm/`](showcase/figures-vlm/Public-test-manuscript/) | 2.3 min |
+| Fast (no VLM) | [`showcase/fast/`](showcase/fast/Public-test-manuscript/) | 65 s |
+| Middle (VLM on figures only) | [`showcase/figures-vlm/`](showcase/figures-vlm/Public-test-manuscript/) | 2.4 min |
 | Suggested default | [`showcase/default/`](showcase/default/Public-test-manuscript/) | 11.8 min |
 
-All three: **68 pages · 15 figures · 17 tables · ~130 chunks · 0 errors.**
+All three: **68 pages · 15 figures · 17 tables · 126–133 chunks · 0 errors.**
 ➡️ **[showcase/README.md](showcase/README.md)** compares them side by side (figure descriptions, table accuracy, versions) and helps you pick one.
 
-Known rough edges: some supplementary figures/tables have no detected caption, the picture classifier occasionally mislabels a chart (e.g. `calendar`), and VLM descriptions can misstate numbers. Check the figure itself before citing a value.
+Known rough edges: some supplementary figures/tables have no detected caption, the figure typer mislabels some charts (2 of 15 here, both with low confidence), and VLM descriptions can misstate numbers. Check the figure itself before citing a value.
 
 ## 🧩 What this fork adds on top of Docling
 
