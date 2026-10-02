@@ -7,7 +7,9 @@ Two complementary signals:
 
 1. **Classifier label** — when the picture classifier
    (``DocumentPictureClassifier``) ran, any picture whose predicted class
-   is in :data:`DEFAULT_NOISE_CLASSES` (configurable) is flagged. This
+   is in :data:`DEFAULT_NOISE_CLASSES` (configurable) is flagged — but only
+   if it covers less than :data:`DEFAULT_MAX_CLASSIFIER_NOISE_AREA` of its
+   page, since a large picture is content even when mislabelled. This
    generic classifier is only trusted for noise; content figure types come
    from :mod:`docling.engines.figure_typing`.
 2. **Repeated-bbox heuristic** — if the same picture geometry appears on
@@ -57,6 +59,10 @@ DEFAULT_NOISE_CLASSES: frozenset[str] = frozenset(
 
 DEFAULT_REPEAT_THRESHOLD = 3  # >=3 pages with same bbox → repeated banner.
 DEFAULT_MIN_AREA = 0  # off by default; opt-in tiny-picture filter.
+# A classifier noise label only counts below this fraction of the page area.
+# Logos / badges / QR codes in 25 medical papers covered <= 1.65 %; the
+# generic classifier called an 8 % 3-D CT rendering ``icon``.
+DEFAULT_MAX_CLASSIFIER_NOISE_AREA = 0.05
 
 
 @dataclass
@@ -75,6 +81,7 @@ def classify_pictures(
     noise_classes: frozenset[str] = DEFAULT_NOISE_CLASSES,
     repeat_threshold: int = DEFAULT_REPEAT_THRESHOLD,
     min_area: float = DEFAULT_MIN_AREA,
+    max_classifier_noise_area: float = DEFAULT_MAX_CLASSIFIER_NOISE_AREA,
 ) -> list[PictureNoiseFlag]:
     """Walk pictures and emit one :class:`PictureNoiseFlag` per item."""
     if result.document is None:
@@ -93,8 +100,10 @@ def classify_pictures(
         reason: str | None = None
 
         if label and label.lower() in {c.lower() for c in noise_classes}:
-            reason = f"classifier:{label}"
-        else:
+            page_frac = _page_area_fraction(pic, result.document)
+            if page_frac is None or page_frac < max_classifier_noise_area:
+                reason = f"classifier:{label}"
+        if reason is None:
             sig = _picture_bbox_signature(pic)
             if sig is not None and bbox_signatures[sig] >= repeat_threshold:
                 reason = f"repeated_bbox:{bbox_signatures[sig]}_pages"
@@ -150,6 +159,16 @@ def _picture_bbox_signature(item: PictureItem) -> tuple | None:
     if bbox is None:
         return None
     return (round(bbox.l / 2), round(bbox.t / 2), round(bbox.r / 2), round(bbox.b / 2))
+
+
+def _page_area_fraction(item: PictureItem, doc) -> float | None:
+    area = _picture_area(item)
+    if area is None:
+        return None
+    page = doc.pages.get(item.prov[0].page_no)
+    if page is None or page.size is None:
+        return None
+    return area / (page.size.width * page.size.height)
 
 
 def _picture_area(item: PictureItem) -> float | None:

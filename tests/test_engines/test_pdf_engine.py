@@ -8,9 +8,17 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from docling_core.types.doc import DoclingDocument
+from docling_core.types.doc import (
+    BoundingBox,
+    DoclingDocument,
+    PictureClassificationClass,
+    PictureClassificationData,
+    ProvenanceItem,
+    Size,
+)
 
 from docling.datamodel.base_models import ConversionStatus
 from docling.engines import PdfConversionOutput, PdfEngine, SourceKind
@@ -19,6 +27,7 @@ from docling.engines.figure_typing import (
     FIGURE_TYPES,
     get_figure_type,
 )
+from docling.engines.picture_filter import classify_pictures
 from docling.engines.validation import (
     InvalidPdfSourceError,
     classify_source,
@@ -421,6 +430,34 @@ def test_pdf_engine_writes_structured_outputs(tmp_path: Path) -> None:
                 "generic_classifier_label",
             ):
                 assert key in row
+
+
+def test_classifier_noise_ignores_large_pictures() -> None:
+    """A generic-classifier noise label only counts for small pictures: the
+    classifier called a page-wide 3-D CT rendering ``icon``, which hid it
+    from the markdown."""
+    doc = DoclingDocument(name="noise")
+    doc.add_page(page_no=1, size=Size(width=600, height=800))
+
+    def picture(label: str, bbox: BoundingBox) -> None:
+        doc.add_picture(
+            prov=ProvenanceItem(page_no=1, bbox=bbox, charspan=(0, 0)),
+            annotations=[
+                PictureClassificationData(
+                    provenance="test",
+                    predicted_classes=[
+                        PictureClassificationClass(class_name=label, confidence=0.9)
+                    ],
+                )
+            ],
+        )
+
+    picture("logo", BoundingBox(l=20, t=20, r=60, b=60))  # 0.3 % of page
+    picture("icon", BoundingBox(l=100, t=200, r=400, b=400))  # 12.5 % of page
+
+    logo, rendering = classify_pictures(SimpleNamespace(document=doc))
+    assert logo.is_noise and logo.noise_reason == "classifier:logo"
+    assert not rendering.is_noise
 
 
 PICTURE_FIXTURE_PDF = Path("tests/data/pdf/sources/picture_classification.pdf")
